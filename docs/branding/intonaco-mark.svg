@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Intonaco mark">
+  <rect x="3" y="3" width="58" height="58" rx="14" fill="#17242A"/>
+  <path d="M18 43V24Q18 18 24 18H44" fill="none" stroke="#83DFCC" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M46 21V40Q46 46 40 46H20" fill="none" stroke="#F0F7F5" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M25 37Q31 25 38 33" fill="none" stroke="#83DFCC" stroke-width="5" stroke-linecap="round"/>
+</svg>
