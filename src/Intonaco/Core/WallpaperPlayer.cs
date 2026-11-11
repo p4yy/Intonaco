@@ -185,6 +185,32 @@ namespace Intonaco.Core
         }
 
         /// <summary>
+        /// Seeks the already-open native surface without replacing the decoder.
+        /// While paused, keep the requested frame as the new pause position.
+        /// </summary>
+        public void Seek(TimeSpan position)
+        {
+            if (_disposed || _mediaElement?.Source == null || !_isMediaOpened)
+                return;
+
+            if (position < TimeSpan.Zero)
+                position = TimeSpan.Zero;
+            if (Duration > TimeSpan.Zero && position > Duration)
+                position = Duration;
+
+            try
+            {
+                _mediaElement.Position = position;
+                if (CurrentState == PlaybackState.Paused)
+                    _pausedPosition = position;
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Seek failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Initializes the player and returns the MediaElement. Desktop code
         /// should prefer <see cref="CreateHost"/>, which also creates the
         /// static paused-frame layer above the video.
