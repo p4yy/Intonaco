@@ -81,6 +81,10 @@ namespace Intonaco.Views
         // wallpaper is a static suspended frame.
         private DispatcherTimer? _placementTimer;
         private DispatcherTimer? _settingsSaveTimer;
+        private DispatcherTimer? _seekUpdateTimer;
+        private DispatcherTimer? _seekCommitTimer;
+        private TimeSpan _pendingSeekPosition;
+        private bool _updatingSeekSlider;
 
         public MainWindow()
         {
@@ -954,8 +958,110 @@ namespace Intonaco.Views
             object sender,
             DependencyPropertyChangedEventArgs e)
         {
-            if (!_isExiting)
-                RefreshPreviewForCurrentState();
+            if (_isExiting)
+                return;
+            RefreshPreviewForCurrentState();
+            UpdateSeekTimer();
+        }
+
+        /// <summary>
+        /// Sample the native playhead only while the control window is visible.
+        /// There is no per-frame listener or extra decoder just for the slider.
+        /// </summary>
+        private void UpdateSeekTimer()
+        {
+            bool active = !_isExiting && IsPreviewWindowVisible &&
+                _player.CurrentState == WallpaperPlayer.PlaybackState.Playing;
+            if (!active)
+            {
+                _seekUpdateTimer?.Stop();
+                RefreshSeekProgress();
+                return;
+            }
+
+            if (_seekUpdateTimer == null)
+            {
+                _seekUpdateTimer = new DispatcherTimer(DispatcherPriority.Background)
+                {
+                    Interval = TimeSpan.FromSeconds(1)
+                };
+                _seekUpdateTimer.Tick += (_, _) => RefreshSeekProgress();
+            }
+
+            RefreshSeekProgress();
+            if (!_seekUpdateTimer.IsEnabled)
+                _seekUpdateTimer.Start();
+        }
+
+        private void RefreshSeekProgress()
+        {
+            if (!IsLoaded || SeekSlider == null)
+                return;
+
+            TimeSpan duration = _player.Duration;
+            TimeSpan position = _player.Position;
+            bool canSeek = duration > TimeSpan.Zero &&
+                _player.CurrentState != WallpaperPlayer.PlaybackState.Stopped &&
+                _player.CurrentState != WallpaperPlayer.PlaybackState.Error;
+
+            _updatingSeekSlider = true;
+            try
+            {
+                SeekSlider.IsEnabled = canSeek;
+                if (!SeekSlider.IsMouseCaptureWithin && _seekCommitTimer?.IsEnabled != true)
+                    SeekSlider.Value = canSeek
+                        ? Math.Clamp(100.0 * position.TotalSeconds /
+                            duration.TotalSeconds, 0.0, 100.0)
+                        : 0;
+                SeekElapsedText.Text = FormatDuration(canSeek ? position : TimeSpan.Zero);
+                SeekDurationText.Text = FormatDuration(canSeek ? duration : TimeSpan.Zero);
+            }
+            finally
+            {
+                _updatingSeekSlider = false;
+            }
+        }
+
+        private void OnSeekChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents || _updatingSeekSlider ||
+                _player.Duration <= TimeSpan.Zero)
+                return;
+
+            // Debounce media seeks so moving the thumb does not ask the 4K
+            // hardware decoder to jump on every pointer event.
+            _pendingSeekPosition = TimeSpan.FromSeconds(
+                _player.Duration.TotalSeconds * Math.Clamp(e.NewValue, 0, 100) / 100);
+            SeekElapsedText.Text = FormatDuration(_pendingSeekPosition);
+
+            if (_seekCommitTimer == null)
+            {
+                _seekCommitTimer = new DispatcherTimer(DispatcherPriority.Background)
+                {
+                    Interval = TimeSpan.FromMilliseconds(240)
+                };
+                _seekCommitTimer.Tick += (_, _) =>
+                {
+                    _seekCommitTimer.Stop();
+                    if (_player.CurrentState == WallpaperPlayer.PlaybackState.Stopped)
+                        return;
+
+                    _player.Seek(_pendingSeekPosition);
+                    try
+                    {
+                        if (PreviewMedia.Source != null)
+                            PreviewMedia.Position = _pendingSeekPosition;
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog.Write("Preview seek failed: " + ex.Message);
+                    }
+                    RefreshSeekProgress();
+                };
+            }
+
+            _seekCommitTimer.Stop();
+            _seekCommitTimer.Start();
         }
 
         private void UpdateBackgroundTimers()
@@ -1056,6 +1162,7 @@ namespace Intonaco.Views
         private void OnStop(object sender, RoutedEventArgs e)
         {
             ++_wallpaperRequestVersion; // Cancel an in-flight async apply.
+            _seekCommitTimer?.Stop();
             StopWallpaper();
         }
 
@@ -1316,6 +1423,7 @@ namespace Intonaco.Views
             {
                 RefreshPreviewForCurrentState();
                 UpdateBackgroundTimers();
+                UpdateSeekTimer();
                 // Pausing keeps the native media surface alive. A full GC
                 // cannot release that decoder and would stall the UI thread.
             }
@@ -1492,6 +1600,7 @@ namespace Intonaco.Views
 
                 FileInfoText.Text = info;
                 RefreshRecentWallpapers();
+                RefreshSeekProgress();
             });
         }
 
@@ -1702,6 +1811,8 @@ namespace Intonaco.Views
             ++_wallpaperRequestVersion;
             _placementTimer?.Stop();
             _settingsSaveTimer?.Stop();
+            _seekUpdateTimer?.Stop();
+            _seekCommitTimer?.Stop();
             _fullscreenDetector.Dispose();
             _foregroundDetector.Dispose();
             _systemEvents.Dispose();
@@ -1722,6 +1833,7 @@ namespace Intonaco.Views
             Activate();
             Focus();
             RefreshPreviewForCurrentState();
+            UpdateSeekTimer();
         }
 
         #endregion
