@@ -225,6 +225,29 @@
                                     VerticalAlignment="Center" />
                         </Grid>
 
+                        <!-- Seek is only sampled while this window is visible.
+                             Desktop playback never waits for the UI slider. -->
+                        <Grid Margin="16,0,16,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="SeekElapsedText" Grid.Column="0" Text="0:00"
+                                       Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <Slider x:Name="SeekSlider" Grid.Column="1"
+                                    Style="{StaticResource IntonacoSlider}"
+                                    AutomationProperties.Name="Wallpaper playback position"
+                                    Minimum="0" Maximum="100" Value="0"
+                                    IsEnabled="False"
+                                    ValueChanged="OnSeekChanged"
+                                    ToolTip="Seek within wallpaper" />
+                            <TextBlock x:Name="SeekDurationText" Grid.Column="2" Text="0:00"
+                                       Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center" Margin="10,0,0,0" />
+                        </Grid>
+
                         <Border Height="1" Margin="16,0" Background="{DynamicResource DividerBrush}" />
 
                         <Grid Margin="16,10">
