@@ -46,7 +46,22 @@ Download an installer or portable build from [GitHub Releases](https://github.co
 | Portable self-contained EXE / zip | No separate .NET installation needed |
 | Framework-dependent zip | .NET 8 Desktop Runtime |
 
-Playback uses the video codecs installed on Windows. **H.264 MP4** is the most reliable choice; WMV, AVI and MOV depend on system codecs. MKV and WebM require compatible codecs. A GPU supporting hardware video decode is recommended.
+## Video format compatibility
+
+Intonaco opens the usual Windows formats directly when the installed system codecs permit: **MP4, M4V, MOV, MKV, WebM, AVI, WMV, ASF, MPEG, MPEG-TS, M2TS and 3GP**. MKV and WebM containers are accepted, but their actual video codecs still determine whether Windows Media Foundation can decode them.
+
+For harder formats such as **FLV, VOB, OGV, RMVB, DivX, MXF, GIF and animated WebP**, an **optional FFmpeg** executable enables compatibility conversion. Unsupported native codecs can also trigger an automatic retry through that conversion path.
+
+To enable this optional feature, install FFmpeg from [ffmpeg.org/download.html](https://ffmpeg.org/download.html), then either add `ffmpeg.exe` to Windows `PATH`, place it next to `Intonaco.exe`, or set `INTONACO_FFMPEG` to the full executable path. Restart Intonaco afterward.
+
+- **Native first:** supported videos play without conversion or extra services.
+- **Copy before encode:** FFmpeg first tries a video-stream-copy MP4 remux, which leaves the original encoded video frames untouched. If Windows rejects that result, Intonaco tries an H.264/AAC compatibility encoding at high quality.
+- **Originals untouched:** prepared files are cached in `%LocalAppData%\\Intonaco\\compatible-video`, and conversions run only when a wallpaper is selected or an incompatible codec is encountered.
+- **Safe failures:** unreadable files and failed preparation do not replace an already-playing wallpaper. A working wallpaper can also be restored after an incompatible decoder failure.
+
+Optional conversion takes CPU time and extra disk space **once per source**; native playback remains the lightweight default. FFmpeg is **not bundled or downloaded automatically**. Some DRM-protected, corrupted, and highly unusual files cannot be played. No application can truthfully guarantee every media format.
+
+A GPU supporting hardware video decode is recommended. For best compatibility and efficient ongoing playback, prefer standard **H.264 MP4** files.
 
 ## Use
 
