@@ -555,6 +555,7 @@ namespace Intonaco.Views
             // Keep a known working video available when trying a new source.
             if (!forceCompatibility)
             {
+                _rollbackOriginalPath = null;
                 _compatibilityAttemptStage = 0;
                 if (_lastVideoOpened && _isApplied && _activeOriginalFile != null)
                 {
@@ -582,7 +583,8 @@ namespace Intonaco.Views
                     if (!forceCompatibility)
                         _compatibilityAttemptStage = 1;
                     string playable = await MediaCompatibility.ConvertAsync(
-                        prepared.PlaybackPath, forceH264, operation.Token);
+                        prepared.PlaybackPath, forceH264, operation.Token,
+                        _player.CurrentFilePath);
 
                     // A remux can carry the same malformed MP4 pixel-aspect
                     // metadata as its source. Re-check the resulting MP4
