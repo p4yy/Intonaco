@@ -20,34 +20,52 @@ namespace Intonaco.Core
     /// </summary>
     public static class MediaFormatProbe
     {
-        /// <summary>
-        /// Containers the Windows Media Foundation pipeline can demux. Anything
-        /// outside this set is rejected before a decoder is ever created.
-        /// </summary>
+        // Most of these containers decode natively on compatible Windows
+        // installations. Less common formats are accepted and normalized
+        // through optional, on-demand FFmpeg compatibility conversion.
+        private static readonly string[] VideoExtensions =
+        {
+            ".mp4", ".m4v", ".mp4v", ".mov", ".qt",
+            ".mkv", ".webm", ".avi", ".wmv", ".asf",
+            ".mpg", ".mpeg", ".m2ts", ".mts", ".m2t", ".ts",
+            ".3gp", ".3g2", ".3gpp",
+            ".flv", ".f4v", ".vob", ".ogv", ".ogg", ".divx",
+            ".rm", ".rmvb", ".amv", ".nsv", ".mxf", ".mpv",
+            ".m2v", ".dat", ".dv", ".nut", ".y4m",
+            ".gif", ".apng", ".webp"
+        };
+
         private static readonly HashSet<string> SupportedExtensions =
+            new HashSet<string>(VideoExtensions, StringComparer.OrdinalIgnoreCase);
+
+        // These are not reliable native WPF MediaElement sources. We prepare
+        // an H.264 MP4 before replacing any already-playing wallpaper.
+        private static readonly HashSet<string> CompatibilityOnlyExtensions =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                ".mp4", ".m4v", ".mov", ".qt",
-                ".mkv", ".webm",
-                ".avi", ".wmv", ".asf",
-                ".mpg", ".mpeg", ".m2ts", ".ts",
-                ".3gp", ".3g2"
+                ".flv", ".f4v", ".vob", ".ogv", ".ogg", ".divx",
+                ".rm", ".rmvb", ".amv", ".nsv", ".mxf", ".mpv",
+                ".m2v", ".dat", ".dv", ".nut", ".y4m",
+                ".gif", ".apng", ".webp"
             };
 
+        public static string FileDialogFilter =>
+            "Video and animated files|" +
+            string.Join(";", Array.ConvertAll(VideoExtensions, ext => "*" + ext)) +
+            "|All files|*.*";
+
         /// <summary>
-        /// Containers that are commonly mistaken for playable video but have no
-        /// Media Foundation demuxer. Naming them lets the error message explain
-        /// what to do instead of only saying "unsupported".
+        /// A recognized extension is accepted for a playback attempt or
+        /// conversion; that is not a promise the installed decoder supports it.
         /// </summary>
-        private static readonly HashSet<string> KnownUnsupportedExtensions =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ".flv", ".rm", ".rmvb", ".vob", ".ogv", ".ogg", ".divx", ".f4v", ".amv", ".nsv"
-            };
+        public static bool RequiresCompatibilityConversion(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+            return CompatibilityOnlyExtensions.Contains(Path.GetExtension(path));
+        }
 
         public const string UnsupportedFormatMessage =
-            "Unable to play video: Unsupported codec or format. " +
-            "Please use standard MP4 (H.264) or WebM files.";
+            "This file is not a recognized video or animated image format.";
 
         public static bool IsSupportedExtension(string? path)
         {
@@ -56,12 +74,10 @@ namespace Intonaco.Core
             return !string.IsNullOrEmpty(ext) && SupportedExtensions.Contains(ext);
         }
 
-        public static bool IsKnownUnsupportedExtension(string? path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return false;
-            string ext = Path.GetExtension(path);
-            return !string.IsNullOrEmpty(ext) && KnownUnsupportedExtensions.Contains(ext);
-        }
+        // Kept as an API alias for older callers: these formats need FFmpeg,
+        // but are no longer rejected by Intonaco's preflight.
+        public static bool IsKnownUnsupportedExtension(string? path) =>
+            RequiresCompatibilityConversion(path);
 
         /// <summary>
         /// Validates a candidate wallpaper file. Returns true when the file is
@@ -78,17 +94,10 @@ namespace Intonaco.Core
                 return false;
             }
 
-            if (IsKnownUnsupportedExtension(path))
-            {
-                error = UnsupportedFormatMessage +
-                        $" ({Path.GetExtension(path).ToUpperInvariant()} files cannot be decoded by Windows.)";
-                return false;
-            }
-
             if (!IsSupportedExtension(path))
             {
                 error = UnsupportedFormatMessage +
-                        $" ({Path.GetFileName(path)} is not a recognised video container.)";
+                        $" ({Path.GetFileName(path)})";
                 return false;
             }
 
