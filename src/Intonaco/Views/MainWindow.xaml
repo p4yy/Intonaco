@@ -4,7 +4,7 @@
         xmlns:tb="http://www.hardcodet.net/taskbar"
         Title="Intonaco"
         Icon="/Assets/intonaco.ico"
-        Width="690" Height="760"
+        Width="700" Height="720"
         MinWidth="620" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBackgroundBrush}"
@@ -37,18 +37,27 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-
-            <Image Grid.Column="0"
-                   x:Name="BrandLogoImage"
-                   Source="/Assets/intonaco-mark-dark.png"
-                   Width="40" Height="40"
-                   Stretch="Uniform"
-                   RenderOptions.BitmapScalingMode="HighQuality"
-                   VerticalAlignment="Center" />
+            <!-- Two open frame corners and a single motion stroke. -->
+            <Grid Grid.Column="0" Width="44" Height="44" VerticalAlignment="Center">
+                <Border Background="{DynamicResource SubtleBackgroundBrush}" CornerRadius="12" />
+                <Viewbox Margin="3" IsHitTestVisible="False">
+                    <Canvas Width="64" Height="64">
+                        <Path Data="M18,43 L18,24 Q18,18 24,18 L44,18"
+                              Stroke="{DynamicResource AccentBrush}" StrokeThickness="5"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                        <Path Data="M46,21 L46,40 Q46,46 40,46 L20,46"
+                              Stroke="{DynamicResource TextPrimaryBrush}" StrokeThickness="5"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                        <Path Data="M25,37 Q31,25 38,33"
+                              Stroke="{DynamicResource AccentBrush}" StrokeThickness="5"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                    </Canvas>
+                </Viewbox>
+            </Grid>
 
             <StackPanel Grid.Column="1" Margin="12,0,16,0" VerticalAlignment="Center">
                 <TextBlock Text="Intonaco" Style="{StaticResource PageTitleText}" />
-                <TextBlock Text="Live wallpaper"
+                <TextBlock Text="Video wallpapers for Windows"
                            Style="{StaticResource CaptionText}"
                            Margin="0,1,0,0" />
             </StackPanel>
@@ -77,7 +86,7 @@
             <StackPanel Margin="28,4,28,24">
 
                 <!-- Wallpaper -->
-                <TextBlock Text="Wallpaper"
+                <TextBlock Text="Now playing"
                            Style="{StaticResource SectionTitleText}"
                            Margin="0,0,0,8" />
 
@@ -85,7 +94,7 @@
                     <StackPanel>
                         <Grid Height="230">
                             <Border Background="{DynamicResource PreviewBackgroundBrush}"
-                                    CornerRadius="8,8,0,0" />
+                                    CornerRadius="12,12,0,0" />
 
                             <StackPanel x:Name="PreviewPlaceholder"
                                         VerticalAlignment="Center"
@@ -96,12 +105,12 @@
                                            FontSize="32"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            HorizontalAlignment="Center" />
-                                <TextBlock Text="No video selected"
+                                <TextBlock Text="Your desktop, in motion"
                                            Style="{StaticResource SettingTitleText}"
                                            FontWeight="SemiBold"
                                            HorizontalAlignment="Center"
                                            Margin="0,10,0,0" />
-                                <TextBlock Text="Drop a video here or choose a file"
+                                <TextBlock Text="Drop an MP4 here or choose a video"
                                            Style="{StaticResource CaptionText}"
                                            HorizontalAlignment="Center"
                                            Margin="0,4,0,0" />
@@ -286,7 +295,7 @@
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Grid.Column="0"
-                               Text="Recent"
+                               Text="Your wallpapers"
                                Style="{StaticResource SectionTitleText}"
                                VerticalAlignment="Center" />
 
@@ -368,7 +377,7 @@
                 </Border>
 
                 <!-- Playback -->
-                <TextBlock Text="Playback"
+                <TextBlock Text="Playback settings"
                            Style="{StaticResource SectionTitleText}"
                            Margin="0,24,0,8" />
 
@@ -480,9 +489,9 @@
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center"
                                         Margin="0,0,12,0">
-                                <TextBlock Text="Background animation when unfocused"
+                                <TextBlock Text="When another app is active"
                                            Style="{StaticResource SettingTitleText}" />
-                                <TextBlock Text="Choose what happens when you switch to another app. Your manual pause is never overridden."
+                                <TextBlock Text="Pause to save resources, or keep the wallpaper moving."
                                            Style="{StaticResource SettingDescriptionText}"
                                            TextWrapping="Wrap" />
                             </StackPanel>
@@ -490,13 +499,13 @@
                             <ComboBox x:Name="BackgroundAnimationComboBox"
                                       Grid.Column="1"
                                       Style="{StaticResource IntonacoComboBox}"
-                                      Width="232"
+                                      Width="190"
                                       VerticalAlignment="Center"
                                       SelectionChanged="OnBackgroundAnimationModeChanged">
-                                <ComboBoxItem Content="Pause when app loses focus (default)"
+                                <ComboBoxItem Content="Pause (recommended)"
                                               Tag="PauseWhenUnfocused"
                                               IsSelected="True" />
-                                <ComboBoxItem Content="Keep animating when unfocused"
+                                <ComboBoxItem Content="Keep playing"
                                               Tag="ContinueWhenUnfocused" />
                             </ComboBox>
                         </Grid>
@@ -504,7 +513,7 @@
                 </Border>
 
                 <!-- General -->
-                <TextBlock Text="General"
+                <TextBlock Text="Preferences"
                            Style="{StaticResource SectionTitleText}"
                            Margin="0,24,0,8" />
 
