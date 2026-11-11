@@ -75,6 +75,19 @@
                            FontWeight="SemiBold"
                            Margin="7,0,0,0"
                            VerticalAlignment="Center" />
+                <Button Style="{StaticResource GhostButton}"
+                        Width="36" Height="36" Padding="0"
+                        Margin="15,0,0,0"
+                        ToolTip="About Intonaco"
+                        AutomationProperties.Name="About Intonaco"
+                        Click="OnAboutClick">
+                    <TextBlock Text="&#xE946;"
+                               FontFamily="{StaticResource IconFont}"
+                               FontSize="17"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Button>
             </StackPanel>
         </Grid>
 
