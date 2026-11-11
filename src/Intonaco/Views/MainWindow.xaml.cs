@@ -1299,7 +1299,7 @@ namespace Intonaco.Views
             return AppSettings.NormalizeFit(fit) switch
             {
                 "Fit" => Stretch.Uniform,
-                "Stretch" => Stretch.Fill,
+                "Stretch" => Stretch.UniformToFill, // Legacy only: never distort.
                 _ => Stretch.UniformToFill
             };
         }
