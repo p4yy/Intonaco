@@ -126,7 +126,6 @@ namespace Intonaco.Tests
         public void BrandIcon_IsEmbedded()
         {
             const string fileName = "intonaco.ico";
-        {
             var assembly = typeof(MainWindow).Assembly;
             using var stream = assembly.GetManifestResourceStream("Intonaco.g.resources");
             Assert.NotNull(stream);
