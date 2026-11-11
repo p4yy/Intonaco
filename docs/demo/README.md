@@ -32,7 +32,7 @@ The README therefore uses three layers:
 
 1. **Zero clicks** — the looping GIF plays inline on the repository page.
 2. **One click** — the preview links to
-   `https://cdn.jsdelivr.net/gh/77worldd/Intonaco@main/docs/demo/intonaco-demo.mp4`.
+   `https://cdn.jsdelivr.net/gh/p4yy/Intonaco@main/docs/demo/intonaco-demo.mp4`.
    [jsDelivr](https://www.jsdelivr.com/?docs=gh) mirrors this public repository
    and serves the MP4 with the correct `video/mp4` MIME type and byte-range
    support, so the browser opens its own video player with sound, seeking and
