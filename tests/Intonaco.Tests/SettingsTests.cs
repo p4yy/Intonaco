@@ -6,6 +6,13 @@ namespace Intonaco.Tests
 {
     public class SettingsTests
     {
+
+        [Fact]
+        public void LegacyStretchMode_MigratesToAspectPreservingFill()
+        {
+            var settings = AppSettings.LoadFromJson("{\"wallpaperFit\":\"Stretch\"}");
+            Assert.Equal("Fill", settings.WallpaperFit);
+        }
         [Fact]
         public void DefaultSettings_HaveSensibleValues()
         {
