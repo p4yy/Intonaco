@@ -83,8 +83,10 @@ namespace Intonaco.Core
         {
             if (string.Equals(fit, "Fit", StringComparison.OrdinalIgnoreCase))
                 return "Fit";
+            // Legacy Stretch can warp a video on monitors with a different
+            // aspect ratio. Migrate it to aspect-preserving Cover/Fill.
             if (string.Equals(fit, "Stretch", StringComparison.OrdinalIgnoreCase))
-                return "Stretch";
+                return "Fill";
             return "Fill";
         }
 
