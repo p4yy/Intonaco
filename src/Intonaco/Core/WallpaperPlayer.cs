@@ -58,15 +58,10 @@ namespace Intonaco.Core
         private double _playbackSpeed = 1.0;
         private bool _loopPlayback = true;
 
-        // Frame-rate throttling. Timeline.DesiredFrameRate caps the media
-        // clock's presentation interval (30 fps -> ~33.3 ms instead of
-        // ~16.6 ms), which is what actually lowers composition cost; the
-        // CompositionTarget gate below measures the achieved rate so the
-        // setting can be verified in debug.log instead of assumed.
-        private readonly FrameRateLimiter _fpsLimiter = new(30);
-        private EventHandler? _fpsRenderHandler;
-        private bool _fpsThrottleActive;
-        private DateTime _fpsGateLastLog = DateTime.MinValue;
+        // Do not subscribe to CompositionTarget.Rendering for FPS statistics:
+        // that callback can keep WPF compositing even with the UI hidden.
+        // DesiredFrameRate is a hint; the native decoder determines the actual
+        // presentation cadence. Profile real CPU/GPU on device instead.
 
         public event Action<string>? ErrorOccurred;
         public event Action<PlaybackState>? StateChanged;
@@ -117,12 +112,10 @@ namespace Intonaco.Core
             set
             {
                 _targetFps = Math.Clamp(value, 1, 60);
-                _fpsLimiter.TargetFps = _targetFps;
 
                 // A live frame-rate change must reach the media clock
                 // immediately, not only on the next ApplyMediaSettings.
                 ApplyFrameRateCap();
-                UpdateFrameRateThrottle();
             }
         }
 
@@ -984,7 +977,6 @@ namespace Intonaco.Core
         {
             _pausedFrameRefreshTimer?.Stop();
             CancelHidePausedFrame();
-            StopFrameRateThrottle();
         }
 
         // The methods below are the legacy static-frame subsystem. They are
@@ -1043,7 +1035,6 @@ namespace Intonaco.Core
 
         private void SuspendMediaPipeline()
         {
-            StopFrameRateThrottle();
             ReleaseMediaPipeline();
             IsSuspended = true;
             _isMediaOpened = false;
@@ -1102,7 +1093,6 @@ namespace Intonaco.Core
             _mediaElement.Volume = _volume;
 
             ApplyFrameRateCap();
-            UpdateFrameRateThrottle();
         }
 
         /// <summary>
@@ -1138,100 +1128,11 @@ namespace Intonaco.Core
         }
 
         /// <summary>
-        /// Runs the frame-interval gate and its measurement only while a
-        /// wallpaper is actually animating below 60 fps, and tears it down the
-        /// moment playback pauses, suspends or stops — a paused wallpaper must
-        /// not keep a CompositionTarget.Rendering subscription alive.
+        /// No periodic rendering probe is attached. Continuous measurement
+        /// was waking the compositor but never blocked any actual frames.
+        /// Use the external performance sampler for trustworthy metrics.
         /// </summary>
-        private void UpdateFrameRateThrottle()
-        {
-            if (_disposed) return;
-
-            bool shouldThrottle =
-                CurrentState == PlaybackState.Playing &&
-                !IsSuspended &&
-                _targetFps < 60 &&
-                _mediaElement?.Source != null;
-
-            if (!shouldThrottle)
-            {
-                StopFrameRateThrottle();
-                return;
-            }
-
-            _fpsLimiter.TargetFps = _targetFps;
-
-            if (_fpsThrottleActive)
-                return;
-
-            _fpsLimiter.Reset();
-            _fpsGateLastLog = DateTime.MinValue;
-            _fpsRenderHandler = OnFrameRateRender;
-            CompositionTarget.Rendering += _fpsRenderHandler;
-            _fpsThrottleActive = true;
-            DebugLog.Write(
-                $"Frame-rate gate engaged: target {_targetFps} fps " +
-                $"(interval {_fpsLimiter.FrameInterval.TotalMilliseconds:F1} ms).");
-        }
-
-        private void StopFrameRateThrottle()
-        {
-            if (_fpsRenderHandler != null)
-            {
-                CompositionTarget.Rendering -= _fpsRenderHandler;
-                _fpsRenderHandler = null;
-            }
-
-            if (_fpsThrottleActive)
-            {
-                double measured = _fpsLimiter.MeasuredFps;
-                if (measured > 0)
-                {
-                    DebugLog.Write(
-                        $"Frame-rate gate released: target {_targetFps} fps, " +
-                        $"measured presentation {measured:F1} fps.");
-                }
-            }
-
-            _fpsThrottleActive = false;
-        }
-
-        /// <summary>
-        /// Presentation rate actually achieved by the frame gate (0 when the
-        /// gate is not running, e.g. at 60 fps or while paused).
-        /// </summary>
-        public double MeasuredFps => _fpsLimiter.MeasuredFps;
-
-        private void OnFrameRateRender(object? sender, EventArgs e)
-        {
-            if (_disposed || _mediaElement == null ||
-                CurrentState != PlaybackState.Playing || IsSuspended)
-            {
-                StopFrameRateThrottle();
-                return;
-            }
-
-            if (e is not RenderingEventArgs args)
-                return;
-
-            // Gate this composition tick against the configured frame interval
-            // and keep the measured rate up to date. Ticks the gate rejects are
-            // the ones Timeline.DesiredFrameRate already skipped presenting, so
-            // the count below is what users can compare against Task Manager.
-            _fpsLimiter.ShouldRender(args);
-
-            // Re-assert the cap occasionally: WPF recreates the media clock on
-            // seek/reopen, which can drop the attached value.
-            DateTime now = DateTime.UtcNow;
-            if (now - _fpsGateLastLog >= TimeSpan.FromSeconds(30))
-            {
-                _fpsGateLastLog = now;
-                ApplyFrameRateCap();
-                DebugLog.Write(
-                    $"Frame-rate gate: target {_targetFps} fps, " +
-                    $"measured presentation {_fpsLimiter.MeasuredFps:F1} fps.");
-            }
-        }
+        public double MeasuredFps => 0.0;
 
         private TimeSpan SafeCurrentPosition()
         {
@@ -1250,7 +1151,6 @@ namespace Intonaco.Core
             if (CurrentState != state)
             {
                 CurrentState = state;
-                UpdateFrameRateThrottle();
                 StateChanged?.Invoke(state);
             }
         }
@@ -1260,8 +1160,6 @@ namespace Intonaco.Core
             if (_disposed) return;
             _disposed = true;
 
-            StopFrameRateThrottle();
-            _fpsLimiter.Dispose();
 
             Stop();
             ReleaseMediaElement(_mediaElement);
