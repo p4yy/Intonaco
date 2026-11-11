@@ -583,7 +583,20 @@ namespace Intonaco.Views
                         _compatibilityAttemptStage = 1;
                     string playable = await MediaCompatibility.ConvertAsync(
                         prepared.PlaybackPath, forceH264, operation.Token);
-                    prepared = prepared with { PlaybackPath = playable };
+
+                    // A remux can carry the same malformed MP4 pixel-aspect
+                    // metadata as its source. Re-check the resulting MP4
+                    // before allowing Windows to render it full-screen.
+                    PreparedWallpaper compatible =
+                        await Mp4AspectSafety.PrepareAsync(playable);
+                    prepared = prepared with
+                    {
+                        PlaybackPath = compatible.PlaybackPath,
+                        SourceWidth = compatible.SourceWidth > 0
+                            ? compatible.SourceWidth : prepared.SourceWidth,
+                        SourceHeight = compatible.SourceHeight > 0
+                            ? compatible.SourceHeight : prepared.SourceHeight
+                    };
                     if (forceH264)
                         _compatibilityAttemptStage = 2;
                 }
