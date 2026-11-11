@@ -1652,6 +1652,11 @@ namespace Intonaco.Views
 
         #endregion
 
+        private void OnAboutClick(object sender, RoutedEventArgs e)
+        {
+            new AboutWindow { Owner = this }.ShowDialog();
+        }
+
         #region Window Management
 
         private void OnWindowStateChanged(object? sender, EventArgs e)
