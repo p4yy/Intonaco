@@ -4,7 +4,7 @@ Intonaco is built and unit-tested on Windows by GitHub Actions on every push
 (see `.github/workflows/ci.yml`). The checks below **require an interactive
 Windows desktop session** and therefore cannot run on a CI agent. They are
 tracked here — and in the
-[verification issue](https://github.com/77worldd/Intonaco/issues) — so they
+[verification issue](https://github.com/p4yy/Intonaco/issues) — so they
 are never silently skipped. If you run any of them, please report results
 (with Windows build, GPU, and video details) on that issue or via PR.
 
@@ -207,14 +207,12 @@ for repeatable comparisons:
 - [ ] Average CPU % and GPU Video Decode % are materially lower when
       the preview window is hidden than when it is visible, and fall to
       idle noise after Pause/fullscreen pause
-- [ ] `debug.log` contains matching `Performance[paused-before-collection]`
-      and `Performance[paused-after-collection]` lines; record private
-      bytes from those lines as well as Task Manager
+- [ ] Confirm pause/resume has no visible stutter, black borders or frame jump; compare private bytes and CPU in the performance samples above
 
 ### Release hygiene
 
-- [ ] Replace `docs/screenshot-placeholder.png` with a real screenshot of the
-      main window (and ideally the live desktop)
+- [ ] Capture a genuine release screenshot of the main window and live desktop;
+      do not use mockups as evidence of a tested build
 - [ ] Confirm the published installer and zips run from a clean folder
       on a machine without the .NET SDK (installer/self-contained) /
       with only the runtime (framework-dependent)
