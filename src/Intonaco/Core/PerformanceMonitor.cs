@@ -1,16 +1,11 @@
 using System;
 using System.Diagnostics;
 using System.Globalization;
-using System.Runtime;
-using System.Windows.Threading;
 
 namespace Intonaco.Core
 {
     /// <summary>
-    /// A point-in-time process footprint used by diagnostics and tests.
-    /// Working-set values are intentionally reported alongside private bytes:
-    /// the former can remain resident after native buffers are freed, while
-    /// the latter shows whether the process actually released its commit.
+    /// Process footprint sampled on demand, never on a rendering callback.
     /// </summary>
     internal sealed class PerformanceSnapshot
     {
@@ -25,7 +20,6 @@ namespace Intonaco.Core
         {
             using var process = Process.GetCurrentProcess();
             process.Refresh();
-
             return new PerformanceSnapshot
             {
                 WorkingSetBytes = process.WorkingSet64,
@@ -49,16 +43,9 @@ namespace Intonaco.Core
         }
     }
 
-    /// <summary>
-    /// Low-frequency, transition-only performance diagnostics. Nothing here
-    /// runs while a wallpaper is animating except an explicit snapshot log;
-    /// collection is delayed until playback has been fully suspended and is
-    /// cancelled by a quick resume.
-    /// </summary>
+    /// <summary>Diagnostics remain optional and never cause GC.</summary>
     internal static class PerformanceMonitor
     {
-        private static DateTime _lastCollectionUtc = DateTime.MinValue;
-
         public static void Log(string reason)
         {
             try
@@ -67,62 +54,8 @@ namespace Intonaco.Core
             }
             catch
             {
-                // Diagnostics must never affect playback.
+                // Diagnostics cannot interrupt playback.
             }
-        }
-
-        public static void SchedulePausedCollection(
-            Dispatcher dispatcher,
-            Func<bool> shouldCollect)
-        {
-            if (dispatcher == null || shouldCollect == null)
-                return;
-
-            var timer = new DispatcherTimer(DispatcherPriority.ApplicationIdle, dispatcher)
-            {
-                Interval = TimeSpan.FromMilliseconds(750)
-            };
-
-            timer.Tick += (_, _) =>
-            {
-                timer.Stop();
-
-                try
-                {
-                    if (!shouldCollect())
-                        return;
-
-                    DateTime now = DateTime.UtcNow;
-                    if (now - _lastCollectionUtc < TimeSpan.FromSeconds(10))
-                    {
-                        Log("paused");
-                        return;
-                    }
-
-                    _lastCollectionUtc = now;
-                    Log("paused-before-collection");
-
-                    // At this point both media pipelines have already been
-                    // closed. A one-off compacting collection returns the
-                    // temporary capture buffers and now-empty managed heaps to
-                    // the OS instead of retaining them for a future allocation.
-                    GCSettings.LargeObjectHeapCompactionMode =
-                        GCLargeObjectHeapCompactionMode.CompactOnce;
-                    GC.Collect(
-                        GC.MaxGeneration,
-                        GCCollectionMode.Aggressive,
-                        blocking: true,
-                        compacting: true);
-
-                    Log("paused-after-collection");
-                }
-                catch
-                {
-                    // Best-effort diagnostics only.
-                }
-            };
-
-            timer.Start();
         }
     }
 }
