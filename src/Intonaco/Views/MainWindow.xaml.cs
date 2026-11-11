@@ -279,14 +279,7 @@ namespace Intonaco.Views
                     double luminance = 0.2126 * color.R + 0.7152 * color.G + 0.0722 * color.B;
                     useDark = luminance < 128;
                 }
-
-                // The supplied primary and transparent masters differ in the
-                // small lower detail; use each on its intended surface.
-                string logoFile = useDark
-                    ? "intonaco-mark-dark.png"
-                    : "intonaco-mark-light.png";
-                BrandLogoImage.Source = new System.Windows.Media.Imaging.BitmapImage(
-                    new Uri($"pack://application:,,,/Assets/{logoFile}", UriKind.Absolute));
+                // The header logo is a device-independent WPF vector.
 
                 IntPtr hwnd = new WindowInteropHelper(this).Handle;
                 if (hwnd == IntPtr.Zero)
@@ -1290,15 +1283,8 @@ namespace Intonaco.Views
             {
                 RefreshPreviewForCurrentState();
                 UpdateBackgroundTimers();
-
-                if (state == WallpaperPlayer.PlaybackState.Paused)
-                {
-                    PerformanceMonitor.SchedulePausedCollection(
-                        Dispatcher,
-                        () => !_isExiting &&
-                              _player.CurrentState == WallpaperPlayer.PlaybackState.Paused &&
-                              !IsPreviewWindowVisible);
-                }
+                // Pausing keeps the native media surface alive. A full GC
+                // cannot release that decoder and would stall the UI thread.
             }
 
             Dispatcher.BeginInvoke(() =>
