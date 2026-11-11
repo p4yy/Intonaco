@@ -109,14 +109,57 @@ namespace Intonaco.Tests
         [InlineData("clip.rmvb")]
         [InlineData("clip.vob")]
         [InlineData("clip.ogv")]
-        public void ContainersWithoutADemuxer_AreRejectedUpFront(string fileName)
+        [InlineData("clip.divx")]
+        [InlineData("clip.mxf")]
+        [InlineData("clip.gif")]
+        [InlineData("clip.webp")]
+        public void CompatibilityFormats_AreAcceptedButFlaggedForConversion(string fileName)
         {
-            Assert.False(MediaFormatProbe.IsSupportedExtension(fileName));
+            Assert.True(MediaFormatProbe.IsSupportedExtension(fileName));
+            Assert.True(MediaFormatProbe.RequiresCompatibilityConversion(fileName));
             Assert.True(MediaFormatProbe.IsKnownUnsupportedExtension(fileName));
-            Assert.False(MediaFormatProbe.TryValidate(
-                Path.Combine(Path.GetTempPath(), fileName), out string error));
-            Assert.Contains("Unsupported codec or format", error, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("MP4 (H.264)", error, StringComparison.Ordinal);
+            Assert.Contains("*" + Path.GetExtension(fileName),
+                MediaFormatProbe.FileDialogFilter, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Theory]
+        [InlineData("movie.mkv")]
+        [InlineData("loop.webm")]
+        [InlineData("movie.mp4")]
+        [InlineData("clip.avi")]
+        [InlineData("clip.mts")]
+        public void NativeCandidates_DoNotForceAnExpensiveConversion(string fileName)
+        {
+            Assert.True(MediaFormatProbe.IsSupportedExtension(fileName));
+            Assert.False(MediaFormatProbe.RequiresCompatibilityConversion(fileName));
+        }
+
+        [Fact]
+        public void CompatibilityFile_PassesPreflightWhenReadable()
+        {
+            string path = Path.Combine(Path.GetTempPath(),
+                "intonaco-test-" + Guid.NewGuid().ToString("N") + ".flv");
+            File.WriteAllBytes(path, new byte[] { 0x46, 0x4C, 0x56, 0x01 });
+            try
+            {
+                Assert.True(MediaFormatProbe.TryValidate(path, out string error));
+                Assert.Equal(string.Empty, error);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Theory]
+        [InlineData("Unable to play video: Unsupported codec or format", true)]
+        [InlineData("Could not decode video", true)]
+        [InlineData("0xC00D5212", true)]
+        [InlineData("File not found", false)]
+        [InlineData("Access denied", false)]
+        public void CodecFailure_IsSeparatedFromFileAccessErrors(string error, bool expected)
+        {
+            Assert.Equal(expected, MediaCompatibility.IsLikelyDecoderFailure(error));
         }
 
         [Fact]
