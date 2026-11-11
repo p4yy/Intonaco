@@ -19,6 +19,7 @@ namespace Intonaco.Core
     {
         private static readonly SemaphoreSlim ConversionGate = new(1, 1);
         private const long MaxConvertedFileBytes = 4L * 1024 * 1024 * 1024;
+        private const long MaxTotalCacheBytes = 8L * 1024 * 1024 * 1024;
 
         internal const string InstallationHint =
             "To play this format, install FFmpeg from https://ffmpeg.org/download.html " +
@@ -95,7 +96,8 @@ namespace Intonaco.Core
         /// remuxed video is not supported by Windows Media Foundation.
         /// </summary>
         internal static async Task<string> ConvertAsync(
-            string source, bool forceH264, CancellationToken cancellation = default)
+            string source, bool forceH264, CancellationToken cancellation = default,
+            string? currentlyPlayingPath = null)
         {
             if (!TryFindFfmpeg(out string ffmpeg))
                 throw new NotSupportedException(InstallationHint);
@@ -155,6 +157,7 @@ namespace Intonaco.Core
                         }
 
                         File.Move(temporary, cached, overwrite: true);
+                        PruneCache(cacheDir, cached, currentlyPlayingPath);
                         return cached;
                     }
                     finally
@@ -171,6 +174,42 @@ namespace Intonaco.Core
             {
                 ConversionGate.Release();
             }
+        }
+
+        private static void PruneCache(
+            string directory, string keep, string? currentlyPlaying)
+        {
+            // Cache pruning runs only after a completed conversion and on the
+            // conversion worker, never on a rendering callback. Never delete
+            // the new video or another cached video currently being played.
+            try
+            {
+                var files = new DirectoryInfo(directory)
+                    .GetFiles("*.mp4", SearchOption.TopDirectoryOnly)
+                    .OrderByDescending(file => file.LastWriteTimeUtc)
+                    .ToArray();
+
+                long total = files.Sum(file => file.Length);
+                foreach (FileInfo file in files.Reverse())
+                {
+                    if (total <= MaxTotalCacheBytes) break;
+                    if (string.Equals(file.FullName, keep, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(file.FullName, currentlyPlaying,
+                            StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    try
+                    {
+                        long length = file.Length;
+                        file.Delete();
+                        total -= length;
+                    }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
+                }
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
 
         // Empty result means success; otherwise a short actionable error.
