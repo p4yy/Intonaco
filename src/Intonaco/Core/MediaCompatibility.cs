@@ -147,6 +147,13 @@ namespace Intonaco.Core
                             continue;
                         }
 
+                        if (new FileInfo(temporary).Length >=
+                            MaxConvertedFileBytes - 1024 * 1024)
+                        {
+                            lastError = "The compatibility cache limit (4 GB) was reached.";
+                            continue;
+                        }
+
                         File.Move(temporary, cached, overwrite: true);
                         return cached;
                     }
@@ -203,8 +210,12 @@ namespace Intonaco.Core
                 args.Add("18");
                 args.Add("-pix_fmt");
                 args.Add("yuv420p");
+                // Preserve display aspect ratio when the source has
+                // non-square pixels by baking the equivalent display width
+                // into the H.264 frames, then outputting square pixels.
+                // This avoids distorting legitimate anamorphic videos.
                 args.Add("-vf");
-                args.Add("setsar=1");
+                args.Add("scale=trunc(iw*sar/2)*2:ih,setsar=1");
             }
             else
             {
