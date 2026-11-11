@@ -31,6 +31,10 @@ namespace Intonaco.Views
             new ObservableCollection<RecentWallpaperItem>();
         private string _fileInfoBase = string.Empty;
         private string? _previewFilePath;
+        private string? _activeOriginalFile;
+        private int _sourceWidth;
+        private int _sourceHeight;
+        private int _wallpaperRequestVersion;
         private bool _previewNeedsPositionSync;
 
         /// <summary>
@@ -439,7 +443,7 @@ namespace Intonaco.Views
         {
             string meta = $"{System.IO.Path.GetExtension(path).TrimStart('.').ToUpperInvariant()} • {FormatFileSize(path)}";
 
-            if (string.Equals(path, _player.CurrentFilePath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(path, _activeOriginalFile, StringComparison.OrdinalIgnoreCase))
             {
                 if (_player.NaturalVideoWidth > 0 && _player.NaturalVideoHeight > 0)
                     meta += $" • {_player.NaturalVideoWidth}×{_player.NaturalVideoHeight}";
@@ -452,7 +456,7 @@ namespace Intonaco.Views
 
         private void OnOpenFileLocation(object sender, RoutedEventArgs e)
         {
-            string? path = _player.CurrentFilePath ?? _settings.LastWallpaperPath;
+            string? path = _activeOriginalFile ?? _settings.LastWallpaperPath;
             try
             {
                 if (!string.IsNullOrEmpty(path) && File.Exists(path))
@@ -521,7 +525,7 @@ namespace Intonaco.Views
             }
         }
 
-        private void ApplyWallpaper(
+        private async void ApplyWallpaper(
             string filePath,
             bool startPaused = false,
             TimeSpan pausedPosition = default)
@@ -537,8 +541,33 @@ namespace Intonaco.Views
                 return;
             }
 
-            // Stop existing playback
+            // Do not tear down an existing wallpaper while preparing a new
+            // source. MP4 pixel-aspect repair runs on a worker thread and
+            // caches a metadata-only correction without touching the original.
+            int requestVersion = ++_wallpaperRequestVersion;
+            PreparedWallpaper prepared;
+            try
+            {
+                prepared = await Mp4AspectSafety.PrepareAsync(filePath);
+            }
+            catch (Exception ex)
+            {
+                if (requestVersion == _wallpaperRequestVersion && !_isExiting)
+                    NotifyPlaybackError("Could not prepare this video safely: " + ex.Message);
+                return;
+            }
+
+            if (_isExiting || requestVersion != _wallpaperRequestVersion)
+                return;
+
+            // Do not keep showing an old decoder when applying a new file.
             StopWallpaper();
+            _sourceWidth = prepared.SourceWidth;
+            _sourceHeight = prepared.SourceHeight;
+            _activeOriginalFile = filePath;
+            if (prepared.CorrectedAspect)
+                DebugLog.Write("MP4 nonstandard pixel aspect normalized in cache; original untouched: " + filePath);
+
 
             // Create player window if needed
             if (_playerWindow == null)
@@ -562,7 +591,7 @@ namespace Intonaco.Views
             }
 
             // Start playback
-            if (!_player.Play(filePath))
+            if (!_player.Play(prepared.PlaybackPath))
             {
                 return; // Error event will fire
             }
@@ -596,13 +625,16 @@ namespace Intonaco.Views
 
             // Update UI
             UpdateFileInfo(filePath);
-            UpdatePreview(filePath);
+            UpdatePreview(prepared.PlaybackPath);
             RefreshRecentWallpapers();
         }
 
         private void StopWallpaper()
         {
             _player.Stop();
+            _activeOriginalFile = null;
+            _sourceWidth = 0;
+            _sourceHeight = 0;
             _desktop.Detach();
             _isApplied = false;
             _pausedByUser = false;
@@ -1023,6 +1055,7 @@ namespace Intonaco.Views
 
         private void OnStop(object sender, RoutedEventArgs e)
         {
+            ++_wallpaperRequestVersion; // Cancel an in-flight async apply.
             StopWallpaper();
         }
 
@@ -1429,6 +1462,28 @@ namespace Intonaco.Views
         {
             Dispatcher.BeginInvoke(() =>
             {
+                if (!_isApplied) return;
+
+                // MediaElement can misinterpret broken MP4 pixel-aspect data:
+                // e.g. report 232x2160 for a genuine 3840x2160 video. Never
+                // stretch such a broken decoder surface across the desktop.
+                if (_sourceWidth > 0 && _sourceHeight > 0 &&
+                    _player.NaturalVideoWidth > 0 && _player.NaturalVideoHeight > 0 &&
+                    (Math.Abs(_player.NaturalVideoWidth - _sourceWidth) > _sourceWidth * 0.15 ||
+                     Math.Abs(_player.NaturalVideoHeight - _sourceHeight) > _sourceHeight * 0.15))
+                {
+                    string message =
+                        "Windows reported incorrect video dimensions (" +
+                        _player.NaturalVideoWidth + "×" + _player.NaturalVideoHeight +
+                        " instead of " + _sourceWidth + "×" + _sourceHeight +
+                        "). Playback was stopped to avoid a distorted wallpaper. " +
+                        "Try a standard H.264 MP4 with square pixels.";
+                    DebugLog.Write("Decoder geometry rejected: " + message);
+                    StopWallpaper();
+                    NotifyPlaybackError(message);
+                    return;
+                }
+
                 string info = _fileInfoBase;
                 if (_player.NaturalVideoWidth > 0 && _player.NaturalVideoHeight > 0)
                     info += $" • {_player.NaturalVideoWidth}×{_player.NaturalVideoHeight}";
@@ -1569,7 +1624,7 @@ namespace Intonaco.Views
             if (_desktop.Reattach())
                 return;
 
-            string? path = _player.CurrentFilePath ?? _settings.LastWallpaperPath;
+            string? path = _activeOriginalFile ?? _settings.LastWallpaperPath;
             var state = _player.CurrentState;
             TimeSpan position = _player.Position;
             if (!string.IsNullOrEmpty(path) && File.Exists(path))
@@ -1639,6 +1694,7 @@ namespace Intonaco.Views
             }
 
             // Actual shutdown
+            ++_wallpaperRequestVersion;
             _placementTimer?.Stop();
             _settingsSaveTimer?.Stop();
             _fullscreenDetector.Dispose();
@@ -1649,6 +1705,9 @@ namespace Intonaco.Views
             _desktop.Dispose();
             TrayIcon.Dispose();
         }
+
+        /// <summary>Called when a second shortcut launch asks this instance to reopen.</summary>
+        public void RestoreFromSecondaryLaunch() => ShowMainWindow();
 
         private void ShowMainWindow()
         {
