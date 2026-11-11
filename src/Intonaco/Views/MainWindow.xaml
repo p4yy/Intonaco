@@ -416,7 +416,7 @@
                                       VerticalAlignment="Center">
                                 <ComboBoxItem Content="Fill screen" Tag="Fill" IsSelected="True" />
                                 <ComboBoxItem Content="Fit frame" Tag="Fit" />
-                                <ComboBoxItem Content="Stretch" Tag="Stretch" />
+
                             </ComboBox>
                         </Grid>
 
