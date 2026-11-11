@@ -7,6 +7,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -35,6 +36,12 @@ namespace Intonaco.Views
         private int _sourceWidth;
         private int _sourceHeight;
         private int _wallpaperRequestVersion;
+        private CancellationTokenSource? _conversionCancellation;
+        private int _compatibilityAttemptStage;
+        private string? _rollbackOriginalPath;
+        private bool _rollbackWasPaused;
+        private TimeSpan _rollbackPosition;
+        private bool _lastVideoOpened;
         private bool _previewNeedsPositionSync;
 
         /// <summary>
@@ -42,9 +49,7 @@ namespace Intonaco.Views
         /// <see cref="MediaFormatProbe"/> so the dialog, drag-and-drop and the
         /// player can never disagree about what is supported.
         /// </summary>
-        private const string VideoDialogFilter =
-            "Video files|*.mp4;*.m4v;*.mov;*.mkv;*.webm;*.avi;*.wmv;*.asf;*.mpg;*.mpeg;*.m2ts;*.ts;*.3gp|" +
-            "All files|*.*";
+        private static string VideoDialogFilter => MediaFormatProbe.FileDialogFilter;
 
         private sealed class RecentWallpaperItem
         {
@@ -371,7 +376,7 @@ namespace Intonaco.Views
             }
             else
             {
-                ShowError("Drop a supported video file: MP4, WebM, MKV, MOV, AVI or WMV.");
+                ShowError("Drop a video or animated file: MP4, MKV, WebM, FLV, MOV, GIF and more.");
             }
             e.Handled = true;
         }
@@ -532,7 +537,9 @@ namespace Intonaco.Views
         private async void ApplyWallpaper(
             string filePath,
             bool startPaused = false,
-            TimeSpan pausedPosition = default)
+            TimeSpan pausedPosition = default,
+            bool forceCompatibility = false,
+            bool forceH264 = false)
         {
             ClearError();
 
@@ -545,20 +552,61 @@ namespace Intonaco.Views
                 return;
             }
 
-            // Do not tear down an existing wallpaper while preparing a new
-            // source. MP4 pixel-aspect repair runs on a worker thread and
-            // caches a metadata-only correction without touching the original.
+            // Keep a known working video available when trying a new source.
+            if (!forceCompatibility)
+            {
+                _compatibilityAttemptStage = 0;
+                if (_lastVideoOpened && _isApplied && _activeOriginalFile != null)
+                {
+                    _rollbackOriginalPath = _activeOriginalFile;
+                    _rollbackWasPaused =
+                        _player.CurrentState == WallpaperPlayer.PlaybackState.Paused;
+                    _rollbackPosition = _player.Position;
+                }
+            }
+
+            // Prepare on demand without disrupting the current wallpaper.
+            _conversionCancellation?.Cancel();
+            var operation = new CancellationTokenSource();
+            _conversionCancellation = operation;
             int requestVersion = ++_wallpaperRequestVersion;
             PreparedWallpaper prepared;
             try
             {
                 prepared = await Mp4AspectSafety.PrepareAsync(filePath);
+
+                if (forceCompatibility ||
+                    MediaFormatProbe.RequiresCompatibilityConversion(filePath))
+                {
+                    StatusText.Text = "Preparing video…";
+                    if (!forceCompatibility)
+                        _compatibilityAttemptStage = 1;
+                    string playable = await MediaCompatibility.ConvertAsync(
+                        prepared.PlaybackPath, forceH264, operation.Token);
+                    prepared = prepared with { PlaybackPath = playable };
+                    if (forceH264)
+                        _compatibilityAttemptStage = 2;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return;
             }
             catch (Exception ex)
             {
                 if (requestVersion == _wallpaperRequestVersion && !_isExiting)
-                    NotifyPlaybackError("Could not prepare this video safely: " + ex.Message);
+                {
+                    NotifyPlaybackError("Could not prepare this video: " + ex.Message);
+                    if (forceCompatibility)
+                        RestoreLastWorkingWallpaper();
+                }
                 return;
+            }
+            finally
+            {
+                if (ReferenceEquals(_conversionCancellation, operation))
+                    _conversionCancellation = null;
+                operation.Dispose();
             }
 
             if (_isExiting || requestVersion != _wallpaperRequestVersion)
@@ -636,6 +684,7 @@ namespace Intonaco.Views
         private void StopWallpaper()
         {
             _player.Stop();
+            _lastVideoOpened = false;
             _activeOriginalFile = null;
             _sourceWidth = 0;
             _sourceHeight = 0;
@@ -1162,6 +1211,8 @@ namespace Intonaco.Views
         private void OnStop(object sender, RoutedEventArgs e)
         {
             ++_wallpaperRequestVersion; // Cancel an in-flight async apply.
+            _conversionCancellation?.Cancel();
+            _rollbackOriginalPath = null;
             _seekCommitTimer?.Stop();
             StopWallpaper();
         }
@@ -1527,9 +1578,49 @@ namespace Intonaco.Views
         private void OnPlayerError(string message)
         {
             if (Dispatcher.CheckAccess())
-                NotifyPlaybackError(message);
+                HandlePlayerError(message);
             else
-                Dispatcher.BeginInvoke(() => NotifyPlaybackError(message));
+                Dispatcher.BeginInvoke(() => HandlePlayerError(message));
+        }
+
+        private void HandlePlayerError(string message)
+        {
+            if (_isExiting) return;
+
+            bool decodeFailure = MediaCompatibility.IsLikelyDecoderFailure(message);
+            if (decodeFailure && _activeOriginalFile != null &&
+                File.Exists(_activeOriginalFile) && _compatibilityAttemptStage < 2 &&
+                MediaCompatibility.TryFindFfmpeg(out _))
+            {
+                string original = _activeOriginalFile;
+                bool encode = _compatibilityAttemptStage > 0;
+                _compatibilityAttemptStage = encode ? 2 : 1;
+                DebugLog.Write("Decoder failed, preparing compatibility " +
+                    (encode ? "H.264 encode." : "remux."));
+                ApplyWallpaper(original, forceCompatibility: true,
+                    forceH264: encode);
+                return;
+            }
+
+            string detail = message;
+            if (decodeFailure && !MediaCompatibility.TryFindFfmpeg(out _))
+                detail += " " + MediaCompatibility.InstallationHint;
+
+            NotifyPlaybackError(detail);
+            RestoreLastWorkingWallpaper();
+        }
+
+        private void RestoreLastWorkingWallpaper()
+        {
+            string? previous = _rollbackOriginalPath;
+            bool paused = _rollbackWasPaused;
+            TimeSpan position = _rollbackPosition;
+            _rollbackOriginalPath = null;
+            if (string.IsNullOrEmpty(previous) || !File.Exists(previous))
+                return;
+
+            DebugLog.Write("Restoring the previous working wallpaper.");
+            ApplyWallpaper(previous, startPaused: paused, pausedPosition: position);
         }
 
         /// <summary>
@@ -1598,6 +1689,8 @@ namespace Intonaco.Views
                 if (duration > TimeSpan.Zero)
                     info += $" • {FormatDuration(duration)}";
 
+                _lastVideoOpened = true;
+                _rollbackOriginalPath = null;
                 FileInfoText.Text = info;
                 RefreshRecentWallpapers();
                 RefreshSeekProgress();
@@ -1808,6 +1901,7 @@ namespace Intonaco.Views
             }
 
             // Actual shutdown
+            _conversionCancellation?.Cancel();
             ++_wallpaperRequestVersion;
             _placementTimer?.Stop();
             _settingsSaveTimer?.Stop();
