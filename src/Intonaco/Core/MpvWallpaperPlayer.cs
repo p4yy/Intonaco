@@ -352,7 +352,7 @@ namespace Intonaco.Core
                         .ConfigureAwait(false);
                     if (line == null)
                         break;
-                    HandleMessage(line);
+                    HandleMessage(line, cancel);
                 }
             }
             catch (OperationCanceledException)
@@ -372,8 +372,9 @@ namespace Intonaco.Core
             }
         }
 
-        private void HandleMessage(string line)
+        private void HandleMessage(string line, CancellationToken sessionToken)
         {
+            if (sessionToken.IsCancellationRequested) return;
             try
             {
                 using JsonDocument doc = JsonDocument.Parse(line);
@@ -387,7 +388,10 @@ namespace Intonaco.Core
                     reason.GetString() == "error")
                 {
                     _dispatcher.BeginInvoke(() =>
-                        ReportError("MPV could not decode this wallpaper."));
+                    {
+                        if (!sessionToken.IsCancellationRequested)
+                            ReportError("MPV could not decode this wallpaper.");
+                    });
                     return;
                 }
 
@@ -395,7 +399,8 @@ namespace Intonaco.Core
                 {
                     _dispatcher.BeginInvoke(() =>
                     {
-                        if (_filePath == null) return;
+                        if (sessionToken.IsCancellationRequested ||
+                            _filePath == null) return;
                         NotifyOpened();
                         if (_positionSeconds > 0)
                             Seek(TimeSpan.FromSeconds(_positionSeconds));
@@ -410,7 +415,8 @@ namespace Intonaco.Core
                 {
                     _dispatcher.BeginInvoke(() =>
                     {
-                        if (CurrentState == WallpaperPlayer.PlaybackState.Playing)
+                        if (!sessionToken.IsCancellationRequested &&
+                            CurrentState == WallpaperPlayer.PlaybackState.Playing)
                             Pause();
                     });
                     return;
@@ -432,7 +438,13 @@ namespace Intonaco.Core
                 {
                     _dispatcher.BeginInvoke(() =>
                     {
-                        Duration = TimeSpan.FromSeconds(Math.Max(0, seconds));
+                        if (sessionToken.IsCancellationRequested) return;
+                        TimeSpan updated = TimeSpan.FromSeconds(Math.Max(0, seconds));
+                        if (updated != Duration)
+                        {
+                            Duration = updated;
+                            if (_opened) MediaOpened?.Invoke(Duration);
+                        }
                         NotifyOpened();
                     });
                 }
@@ -443,8 +455,13 @@ namespace Intonaco.Core
                     int h = ReadInt(data, "h");
                     _dispatcher.BeginInvoke(() =>
                     {
+                        if (sessionToken.IsCancellationRequested) return;
+                        bool dimensionsChanged =
+                            NaturalVideoWidth != w || NaturalVideoHeight != h;
                         NaturalVideoWidth = w;
                         NaturalVideoHeight = h;
+                        if (dimensionsChanged && _opened)
+                            MediaOpened?.Invoke(Duration);
                         NotifyOpened();
                     });
                 }
