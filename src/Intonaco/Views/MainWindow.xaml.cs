@@ -605,12 +605,15 @@ namespace Intonaco.Views
             }
             catch (OperationCanceledException)
             {
+                if (requestVersion == _wallpaperRequestVersion && !_isExiting)
+                    ResetStatusAfterPreparation();
                 return;
             }
             catch (Exception ex)
             {
                 if (requestVersion == _wallpaperRequestVersion && !_isExiting)
                 {
+                    ResetStatusAfterPreparation();
                     NotifyPlaybackError("Could not prepare this video: " + ex.Message);
                     if (forceCompatibility)
                         RestoreLastWorkingWallpaper();
@@ -694,6 +697,16 @@ namespace Intonaco.Views
             UpdateFileInfo(filePath);
             UpdatePreview(prepared.PlaybackPath);
             RefreshRecentWallpapers();
+        }
+
+        private void ResetStatusAfterPreparation()
+        {
+            StatusText.Text = _player.CurrentState switch
+            {
+                WallpaperPlayer.PlaybackState.Playing => "Playing",
+                WallpaperPlayer.PlaybackState.Paused => "Paused",
+                _ => "Stopped"
+            };
         }
 
         private void StopWallpaper()
@@ -1683,8 +1696,13 @@ namespace Intonaco.Views
                 // stretch such a broken decoder surface across the desktop.
                 if (_sourceWidth > 0 && _sourceHeight > 0 &&
                     _player.NaturalVideoWidth > 0 && _player.NaturalVideoHeight > 0 &&
-                    (Math.Abs(_player.NaturalVideoWidth - _sourceWidth) > _sourceWidth * 0.15 ||
-                     Math.Abs(_player.NaturalVideoHeight - _sourceHeight) > _sourceHeight * 0.15))
+                    // Reject wildly incorrect decoder dimensions without blocking
+                    // legitimate non-square-pixel/anamorphic video (such as
+                    // 1440x1080 video displayed at 1920x1080).
+                    (_player.NaturalVideoWidth < _sourceWidth / 2 ||
+                     _player.NaturalVideoWidth > _sourceWidth * 2 ||
+                     _player.NaturalVideoHeight < _sourceHeight / 2 ||
+                     _player.NaturalVideoHeight > _sourceHeight * 2))
                 {
                     string message =
                         "Windows reported incorrect video dimensions (" +
