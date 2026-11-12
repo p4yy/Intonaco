@@ -80,7 +80,7 @@ jobs:
           $version = [string]($project.Project.PropertyGroup.Version |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
             Select-Object -First 1)
-          $output = "artifacts/store/Intonaco-Wallpaper-v$version-win-x64.msix"
+          $output = "artifacts/store/Intonaco-Wallpaper.msix"
           & ./store/Build-StorePackage.ps1 `
             -PublishDir artifacts/store-app `
             -PackageIdentityName $identity `
@@ -105,7 +105,7 @@ jobs:
       - name: Upload Partner Center submission file (unsigned)
         uses: actions/upload-artifact@v4
         with:
-          name: Intonaco-Wallpaper-PartnerCenter-StoreUpload
+          name: Intonaco-Wallpaper-Microsoft-Store
           path: artifacts/store/*.msixupload
           if-no-files-found: error
           retention-days: 30
