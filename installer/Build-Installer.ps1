@@ -96,7 +96,7 @@ if ($compilerExitCode -ne 0) {
     throw "Inno Setup compilation failed with exit code $compilerExitCode.`n$detail"
 }
 
-$setupPath = Join-Path $outputPath "Intonaco-v$Version-win-x64-setup.exe"
+$setupPath = Join-Path $outputPath "Intonaco-Wallpaper-v$Version-win-x64-setup.exe"
 if (-not (Test-Path -LiteralPath $setupPath)) {
     throw "Installer was not created: $setupPath"
 }
