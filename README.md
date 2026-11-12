@@ -11,7 +11,7 @@
 
 <p align="center"><strong>Your video. Your desktop. Nothing extra.</strong></p>
 
-Intonaco is a focused, open-source Windows app that plays a local video **behind your desktop icons**. It uses WPF and Windows Media Foundation instead of embedding a browser or shipping a separate media engine.
+**Intonaco Wallpaper** is a focused, open-source Windows app that plays a local video **behind your desktop icons**. It uses WPF and Windows Media Foundation instead of embedding a browser or shipping a separate media engine.
 
 <p align="center">
   <a href="https://cdn.jsdelivr.net/gh/p4yy/Intonaco@main/docs/demo/intonaco-demo.mp4" title="Watch the Intonaco demo">
@@ -38,7 +38,7 @@ No accounts, wallpaper storefront, embedded browser, telemetry SDK or background
 
 ## Install
 
-Download an installer or portable build from [GitHub Releases](https://github.com/p4yy/Intonaco/releases).
+Download the **Intonaco Wallpaper** installer or portable build from [GitHub Releases](https://github.com/p4yy/Intonaco/releases).
 
 | Download | Requirements |
 | --- | --- |
@@ -75,14 +75,14 @@ Native Windows remains the default. Video engine compatibility, output quality a
 
 ## Use
 
-1. Open Intonaco and choose a video, or drop a video on the window.
+1. Open Intonaco Wallpaper and choose a video, or drop a video on the window.
 2. Choose fit, volume, preferred frame rate and looping.
 3. Minimize to the system tray. The desktop wallpaper continues without the second preview decoder.
 4. Pause from the tray when you want a still frame without changing your desktop.
 
 **Default behavior:** wallpaper animation pauses when you switch to another app. In *Playback settings → When another app is active*, select **Keep playing** to change it. Manual pause always takes priority.
 
-Settings and logs remain in `%LocalAppData%\Intonaco` through an uninstall or upgrade.
+**Compatibility:** Settings and logs intentionally remain in `%LocalAppData%\Intonaco` through an uninstall or upgrade. The executable remains `Intonaco.exe` internally to keep older shortcuts and startup registrations working.
 
 ## Build and test
 
@@ -119,6 +119,8 @@ Store publication needs a signed EXE/MSI installer or a separately packaged MSIX
 plus real-device QA. See the [Store submission checklist](docs/MICROSOFT_STORE.md).
 
 ## Project
+
+**Find live wallpapers:** The app's collapsed **Get live wallpapers** section contains six independent sources. Press **Copy link** to copy a source address, paste it into your preferred browser, download a compatible local video, and open that file in Intonaco Wallpaper. The app does not automatically redirect, stream, scrape, or download third-party content. Always check the content's license.
 
 [Source](src/Intonaco) · [Tests](tests/Intonaco.Tests) · [Changelog](CHANGELOG.md) · [Brand](docs/branding) · [Demo](docs/demo) · [Issues](https://github.com/p4yy/Intonaco/issues)
 
