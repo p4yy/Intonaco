@@ -81,6 +81,8 @@ namespace Intonaco.Views
         private bool _firstContentRendered;
         private bool _pendingWindowRestore;
         private bool _startupWallpaperScheduled;
+        private string? _startupRestoreFile;
+        private int _startupAttachRetryCount;
 
         // Explorer restart detection
         private uint _shellRestartMessage;
@@ -307,6 +309,16 @@ namespace Intonaco.Views
             _systemEvents.Start();
             UpdateTitleBarTheme();
 
+            // Some WPF/GPU configurations delay ContentRendered when the
+            // window is initially transparent. ApplicationIdle is a fallback,
+            // not the normal first-paint path.
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,
+                (Action)(() =>
+                {
+                    if (!_firstContentRendered)
+                        OnInitialContentRendered(this, EventArgs.Empty);
+                }));
+
             // Second-launch signals can arrive while StartupUri is still
             // constructing the first window. Honour them after first layout.
             if (Application.Current is App app && app.ConsumePendingShowRequest())
@@ -415,9 +427,53 @@ namespace Intonaco.Views
                     return;
 
                 DebugLog.Write("Deferred wallpaper restore after first paint: " + path);
+                _startupRestoreFile = path;
                 ApplyWallpaper(path);
             };
             restoreTimer.Start();
+        }
+
+        private void ScheduleStartupAttachmentRetry(string filePath)
+        {
+            // Explorer may not have created Progman/WorkerW immediately at
+            // sign-in. Retry only desktop attachment errors, and never
+            // override a newer wallpaper selected by the user.
+            if (_isExiting || _startupAttachRetryCount >= 3)
+                return;
+
+            int expectedRequestVersion = _wallpaperRequestVersion;
+            int attempt = ++_startupAttachRetryCount;
+            var timer = new DispatcherTimer(DispatcherPriority.Background)
+            {
+                Interval = TimeSpan.FromSeconds(attempt * 3)
+            };
+            timer.Tick += async (_, _) =>
+            {
+                timer.Stop();
+                if (_isExiting || _isApplied ||
+                    _wallpaperRequestVersion != expectedRequestVersion ||
+                    !string.Equals(_settings.LastWallpaperPath, filePath,
+                        StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                try
+                {
+                    await _desktop.PrepareDesktopLayerAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    DebugLog.Write("Startup desktop retry prewarm: " + ex.Message);
+                }
+
+                if (_isExiting || _isApplied ||
+                    _wallpaperRequestVersion != expectedRequestVersion ||
+                    !File.Exists(filePath))
+                    return;
+
+                DebugLog.Write($"Retrying desktop attachment after Explorer login: {attempt}/3");
+                ApplyWallpaper(filePath);
+            };
+            timer.Start();
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -786,6 +842,9 @@ namespace Intonaco.Views
                 // on screen as a floating black rectangle.
                 StopWallpaper();
                 ShowError($"{reason} Details logged to %LocalAppData%\\Intonaco\\debug.log");
+                if (string.Equals(_startupRestoreFile, filePath,
+                    StringComparison.OrdinalIgnoreCase))
+                    ScheduleStartupAttachmentRetry(filePath);
                 return;
             }
 
