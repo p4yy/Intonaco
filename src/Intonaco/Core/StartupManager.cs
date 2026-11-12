@@ -36,7 +36,12 @@ namespace Intonaco.Core
             catch { return null; }
         }
 
-        public static void Register()
+        // A startup launch may be silent, but a deliberate Start menu or
+        // desktop shortcut launch must always open the UI normally.
+        internal static string BuildStartupCommand(string exePath, bool startMinimized) =>
+            $"\"{exePath}\"" + (startMinimized ? " --minimized" : "");
+
+        public static void Register(bool startMinimized = false)
         {
             try
             {
@@ -45,9 +50,9 @@ namespace Intonaco.Core
                     ?? throw new InvalidOperationException("Cannot determine executable path");
 
                 using var key = Registry.CurrentUser.OpenSubKey(RegistryKey, true);
-                // Always include --minimized so the app starts silently in tray.
-                key?.SetValue(AppName, $"\"{exePath}\" --minimized");
-                DebugLog.Write($"StartupManager: registered '{exePath}' with --minimized");
+                string command = BuildStartupCommand(exePath, startMinimized);
+                key?.SetValue(AppName, command);
+                DebugLog.Write($"StartupManager: registered '{command}'");
             }
             catch (Exception ex)
             {
