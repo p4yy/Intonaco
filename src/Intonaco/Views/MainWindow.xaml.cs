@@ -22,7 +22,7 @@ namespace Intonaco.Views
     public partial class MainWindow : Window
     {
         private readonly AppSettings _settings;
-        private readonly WallpaperPlayer _player;
+        private IWallpaperPlayer _player;
         private readonly DesktopIntegration _desktop;
         private readonly FullscreenDetector _fullscreenDetector;
         private readonly ForegroundDetector _foregroundDetector;
@@ -93,7 +93,14 @@ namespace Intonaco.Views
         public MainWindow()
         {
             _settings = AppSettings.Load();
-            _player = new WallpaperPlayer();
+            if (_settings.PlaybackBackend == "MPV" &&
+                !MpvWallpaperPlayer.TryLocateExecutable(out _))
+            {
+                DebugLog.Write("Saved MPV backend not installed; using Windows player.");
+                _settings.PlaybackBackend = "Windows";
+                _settings.Save();
+            }
+            _player = CreatePlayer(_settings.PlaybackBackend);
             _desktop = new DesktopIntegration();
             _fullscreenDetector = new FullscreenDetector();
             _foregroundDetector = new ForegroundDetector();
@@ -110,6 +117,7 @@ namespace Intonaco.Views
             LoadSettings();
             WireEvents();
             InitializeSystemTray();
+            UpdateBackendInterface();
 
             // Handle silent boot: --minimized / -m / StartMinimized setting.
             // StartupUri calls Show() after this constructor returns, so hiding
@@ -147,9 +155,50 @@ namespace Intonaco.Views
             }
         }
 
+        private static IWallpaperPlayer CreatePlayer(string backend) =>
+            AppSettings.NormalizeBackend(backend) == "MPV"
+                ? new MpvWallpaperPlayer() : new WallpaperPlayer();
+
+        private void ApplyPlayerSettings()
+        {
+            _player.TargetFps = _settings.TargetFps;
+            _player.StretchMode = ParseFitMode(_settings.WallpaperFit);
+            _player.PlaybackSpeed = _settings.PlaybackSpeed;
+            _player.LoopPlayback = _settings.LoopPlayback;
+            _player.Volume = _settings.Volume;
+            _player.SetMute(_settings.IsMuted);
+        }
+
+        private void WirePlayerEvents()
+        {
+            _player.StateChanged += OnPlayerStateChanged;
+            _player.ErrorOccurred += OnPlayerError;
+            _player.MediaOpened += OnMediaOpened;
+        }
+
+        private void UnwirePlayerEvents()
+        {
+            _player.StateChanged -= OnPlayerStateChanged;
+            _player.ErrorOccurred -= OnPlayerError;
+            _player.MediaOpened -= OnMediaOpened;
+        }
+
+        private void UpdateBackendInterface()
+        {
+            bool mpv = _player is MpvWallpaperPlayer;
+            FpsComboBox.IsEnabled = !mpv;
+            FpsComboBox.ToolTip = mpv
+                ? "MPV uses the source's native frame cadence; the Windows FPS cap does not apply."
+                : "Preferred presentation frame rate.";
+            PreviewHintText.Text = mpv
+                ? "MPV shows the wallpaper on the desktop without a second decoder."
+                : "Drop a video here or choose a file";
+        }
+
         private void LoadSettings()
         {
             _suppressEvents = true;
+            SelectComboByTag(BackendComboBox, _settings.PlaybackBackend);
 
             // Dedicated focus-animation mode. Mode A pauses animation
             // updates on focus loss; Mode B keeps them running. The choice is
@@ -212,9 +261,7 @@ namespace Intonaco.Views
 
         private void WireEvents()
         {
-            _player.StateChanged += OnPlayerStateChanged;
-            _player.ErrorOccurred += OnPlayerError;
-            _player.MediaOpened += OnMediaOpened;
+            WirePlayerEvents();
 
             // Focus-driven auto-pause (Mode A). Both detectors are gated by
             // the selected background animation mode; Mode B stops them so
@@ -782,6 +829,18 @@ namespace Intonaco.Views
         /// </summary>
         private void RefreshPreviewForCurrentState()
         {
+            // MPV's desktop surface is the only MPV decoder. Avoid starting
+            // a separate MediaElement that may not understand MPV-only codecs.
+            if (_player is MpvWallpaperPlayer)
+            {
+                ReleasePreviewPipeline();
+                PreviewImage.Source = null;
+                PreviewImage.Visibility = Visibility.Collapsed;
+                PreviewPlaceholder.Visibility = Visibility.Visible;
+                PreviewHintText.Text =
+                    "MPV renders on your desktop without a second preview decoder.";
+                return;
+            }
             if (_previewFilePath == null)
             {
                 ReleasePreviewPipeline();
@@ -1321,6 +1380,53 @@ namespace Intonaco.Views
 
             _settings.StartWithWindows = StartWithWindowsToggle.IsChecked == true;
             _settings.Save();
+        }
+
+        private void OnBackendChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents ||
+                BackendComboBox.SelectedItem is not ComboBoxItem item ||
+                item.Tag is not string candidate)
+                return;
+
+            string requested = AppSettings.NormalizeBackend(candidate);
+            if (requested == _settings.PlaybackBackend)
+                return;
+
+            if (requested == "MPV" &&
+                !MpvWallpaperPlayer.TryLocateExecutable(out _))
+            {
+                _suppressEvents = true;
+                try { SelectComboByTag(BackendComboBox, _settings.PlaybackBackend); }
+                finally { _suppressEvents = false; }
+                ShowError("MPV is optional and not bundled. Install mpv from mpv.io, " +
+                    "put mpv.exe beside Intonaco.exe or add it to PATH, then choose MPV again.");
+                return;
+            }
+
+            string? activeFile = _activeOriginalFile;
+            bool wasPaused = _player.CurrentState == WallpaperPlayer.PlaybackState.Paused;
+            TimeSpan position = _player.Position;
+
+            // Release one backend fully before activating the next. Never
+            // retain two desktop decoders or orphaned MPV processes.
+            ++_wallpaperRequestVersion;
+            _preparationCancellation?.Cancel();
+            StopWallpaper();
+            UnwirePlayerEvents();
+            _player.Dispose();
+            _player = CreatePlayer(requested);
+            WirePlayerEvents();
+
+            _settings.PlaybackBackend = requested;
+            ApplyPlayerSettings();
+            UpdateBackendInterface();
+            _settings.Save();
+            RefreshPreviewForCurrentState();
+            UpdateSeekTimer();
+
+            if (!string.IsNullOrEmpty(activeFile) && File.Exists(activeFile))
+                ApplyWallpaper(activeFile, startPaused: wasPaused, pausedPosition: position);
         }
 
         private void OnFpsChanged(object sender, SelectionChangedEventArgs e)
