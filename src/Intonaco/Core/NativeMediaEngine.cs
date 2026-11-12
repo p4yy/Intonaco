@@ -135,8 +135,11 @@ namespace Intonaco.Core
             // Handle MLW only when it is transparently a video or
             // ZIP-wrapped video. Proprietary variants fail with a precise
             // error instead of being passed to Media Foundation as garbage.
-            string playablePath = await MlwMediaSupport.PrepareAsync(
-                path, cancellationToken).ConfigureAwait(false);
+            string playablePath = MlwMediaSupport.IsMlw(path)
+                ? await Task.Run(
+                    () => MlwMediaSupport.PrepareAsync(path, cancellationToken),
+                    cancellationToken).ConfigureAwait(false)
+                : path;
 
             // Container inspection and optional metadata correction happen
             // away from the WPF dispatcher; never block UI while copying.
