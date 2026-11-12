@@ -1,5 +1,32 @@
 # Verification checklist
 
+## v2.1.2 smoke test — desktop shortcut, discovery, installer and Store
+
+- [ ] Launch Intonaco using its desktop shortcut with no instance running:
+      one normal, fully painted window appears at the compact size.
+- [ ] Minimize the main window or close it to the system tray, then click
+      the desktop shortcut again: the existing window restores and paints,
+      without creating another process or staying as a black taskbar thumbnail.
+- [ ] Repeat while a video is playing, paused, and after Windows sign-in.
+- [ ] With the app starting at Windows sign-in, check both Start minimized
+      settings. A manual shortcut launch must still show the app.
+- [ ] Expand **Get live wallpapers**. Check six legible site rows; pressing
+      **Copy link** copies its HTTPS URL without opening a website/browser.
+      Verify pasted URLs work in a separate browser and check licenses there.
+- [ ] Confirm recent wallpaper items are single-column and responsive at
+      620 DIP width and under Windows 125%, 150% and 200% scaling.
+- [ ] Open the installer: confirm the real Intonaco logo appears on the
+      dark branded wizard panel, with readable text and sharp high-DPI art.
+- [ ] Verify the installer details/Programs list publisher is **Acev Dev Co**.
+      This does NOT establish a verified Authenticode security identity:
+      unsigned binaries can still show "Unknown publisher" in Windows.
+- [ ] Install/upgrade/uninstall: verify video playback, settings retention,
+      desktop shortcut restoration, and no unexpected startup entries.
+- [ ] Separately test the Store MSIX built with real Partner Center identity
+      on a clean Windows user profile; development-preview MSIX is not a
+      valid Store submission.
+
+
 Intonaco is built and unit-tested on Windows by GitHub Actions on every push
 (see `.github/workflows/ci.yml`). The checks below **require an interactive
 Windows desktop session** and therefore cannot run on a CI agent. They are

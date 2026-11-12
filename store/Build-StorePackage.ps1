@@ -6,14 +6,14 @@ param(
     [Parameter(Mandatory = $true)][string]$PublisherDistinguishedName,
     [Parameter(Mandatory = $true)][string]$PublisherDisplayName,
     [Parameter(Mandatory = $true)][string]$Version,
-    [string]$OutputPath = "artifacts/store/IntonacoWallpaper.msix"
+    [string]$OutputPath = "artifacts/store/Intonaco-Wallpaper.msix"
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 if ($Version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-    throw "MSIX version must use four numeric parts (example: 2.1.1.0)."
+    throw "MSIX version must use four numeric parts (example: 2.1.2.0)."
 }
 if ($PackageIdentityName -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{2,49}$') {
     throw "Use the exact Partner Center package Identity Name."

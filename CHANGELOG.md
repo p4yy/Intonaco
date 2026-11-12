@@ -4,6 +4,45 @@ All notable changes to Intonaco are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] — 2026-11-12
+
+A consistent Intonaco Wallpaper identity, cleaner discovery and more reliable desktop shortcut activation.
+
+### Added
+- Compact, expandable **Get live wallpapers** section with six curated
+  third-party live wallpaper and video source websites.
+- Copy-only site actions: no automatic redirects, embedded browser,
+  scraping, download tracking or additional video decoder.
+- Strict local HTTPS allowlist and tests for the source-copy feature.
+- Branded Inno Setup welcome panel, generated from the **official** logo
+  at installer-build time, with publisher metadata **Acev Dev Co**.
+
+### Fixed
+- Preserve second-launch restore requests received before the main WPF
+  window has loaded.
+- Defer a secondary-shortcut restore until pending minimize and layout
+  events settle, using the same UI restoration path as the tray shortcut.
+
+### Improved
+- Product renamed to **Intonaco Wallpaper** across windows, tray, About,
+  installer, Start menu, official wordmarks, Windows version info and Store
+  packaging. The internal executable and settings folder retain their
+  original names so upgrades don't disrupt user files or startup entries.
+- Official release filenames are consistent and no longer duplicate the
+  setup EXE and portable EXE under multiple aliases.
+- Small compiler and analysis warnings cleaned up without changing the
+  video decoding or playback logic.
+- Single-column recent-wallpaper rows fit the compact default width
+  without crowding.
+- The wallpaper directory is collapsed by default for less visual clutter;
+  opening or copying sources does not load remote content.
+- Both GitHub EXE/installer and a separate Store preview MSIX are built
+  from the updated code; the Store upload requires exact Partner Center
+  package identity and publisher values.
+- Windows executable metadata now lists **Acev Dev Co**. A trusted
+  Authenticode signature is still required for Windows to show this
+  company as the *verified* publisher rather than "Unknown publisher".
+
 ## [2.1.1] — 2026-11-12
 
 A focused Windows startup and window-restoration update.

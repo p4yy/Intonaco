@@ -15,6 +15,16 @@ namespace Intonaco
         private RegisteredWaitHandle? _showExistingWait;
         private const string ShowExistingEventName = @"Local\Intonaco_ShowMainWindow";
         private bool _ownsMutex;
+        private bool _pendingShowExisting;
+
+        // Called on the UI dispatcher by MainWindow.Loaded. A second
+        // instance can signal before StartupUri creates the window.
+        internal bool ConsumePendingShowRequest()
+        {
+            bool pending = _pendingShowExisting;
+            _pendingShowExisting = false;
+            return pending;
+        }
         private ResourceDictionary? _lightThemeDictionary;
         private string _themePreference = "System";
         private const string MutexName = "Intonaco_SingleInstance_Mutex";
@@ -58,7 +68,16 @@ namespace Intonaco
                     Dispatcher.BeginInvoke(() =>
                     {
                         if (MainWindow is Views.MainWindow window)
+                        {
+                            // Do not drop a desktop shortcut request just
+                            // because Loaded has not fired (startup-to-tray
+                            // may suppress that first Loaded notification).
                             window.RestoreFromSecondaryLaunch();
+                        }
+                        else
+                        {
+                            _pendingShowExisting = true;
+                        }
                     });
                 },
                 null, Timeout.Infinite, executeOnlyOnce: false);
@@ -173,8 +192,8 @@ namespace Intonaco
             catch { /* Logging must never throw. */ }
 
             MessageBox.Show(
-                "Intonaco hit an unexpected error but will keep running.\n\n" + e.Exception.Message,
-                "Intonaco", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Intonaco Wallpaper hit an unexpected error but will keep running.\n\n" + e.Exception.Message,
+                "Intonaco Wallpaper", MessageBoxButton.OK, MessageBoxImage.Warning);
             e.Handled = true;
         }
     }

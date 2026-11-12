@@ -6,7 +6,7 @@
 ; reinstalls and uninstall do not delete them.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "2.1.1"
+  #define MyAppVersion "2.1.2"
 #endif
 
 #ifndef PublishDir
@@ -17,8 +17,8 @@
   #define OutputDir "..\release"
 #endif
 
-#define MyAppName "Intonaco"
-#define MyAppPublisher "Intonaco Contributors"
+#define MyAppName "Intonaco Wallpaper"
+#define MyAppPublisher "Acev Dev Co"
 #define MyAppURL "https://github.com/p4yy/Intonaco"
 #define MyAppExeName "Intonaco.exe"
 
@@ -33,16 +33,17 @@ AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
 VersionInfoVersion={#MyAppVersion}.0
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription=Intonaco live wallpaper for Windows
+VersionInfoDescription=Intonaco Wallpaper - live video wallpapers for Windows
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={autopf}\Intonaco
+; Keep the original install folder and AppId so upgrades preserve files and preferences.
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 AllowNoIcons=no
 LicenseFile=..\LICENSE
 OutputDir={#OutputDir}
-OutputBaseFilename=Intonaco-v{#MyAppVersion}-win-x64-setup
+OutputBaseFilename=Intonaco-Wallpaper-v{#MyAppVersion}-win-x64-setup
 SetupIconFile=..\src\Intonaco\Assets\intonaco.ico
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
@@ -50,6 +51,8 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
 WizardStyle=modern
+WizardImageFile=branding\Welcome.bmp
+WizardSmallImageFile=branding\Header.bmp
 PrivilegesRequired=lowest
 MinVersion=10.0.18362
 ArchitecturesAllowed=x64
@@ -70,13 +73,18 @@ SetupLogging=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-WelcomeLabel2=This will install [name/ver] on your computer.%n%nIntonaco is self-contained: no .NET installation or administrator account is required. Your Intonaco settings are stored separately and are preserved during upgrades and uninstall.
+WelcomeLabel2=Bring your Windows desktop to life with local video wallpapers.%n%nIntonaco Wallpaper installs without a separate .NET download. Existing wallpapers and preferences are preserved when updating.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+; Remove only shortcuts belonging to the old display name during upgrades.
+Type: files; Name: "{autoprograms}\Intonaco.lnk"
+Type: files; Name: "{autodesktop}\Intonaco.lnk"
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Comment: "Lightweight live wallpaper for Windows"

@@ -10,16 +10,14 @@ namespace Intonaco.Core
     public sealed class SystemEventMonitor : IDisposable
     {
         private bool _disposed;
-        private bool _isScreenOff;
         private bool _isLocked;
         private bool _isSuspended;
 
         public event Action? ShouldPause;
         public event Action? ShouldResume;
         public event Action? DisplayChanged;
-        public event Action? ExplorerRestarted;
 
-        public bool IsPausedBySystem => _isScreenOff || _isLocked || _isSuspended;
+        public bool IsPausedBySystem => _isLocked || _isSuspended;
 
         public void Start()
         {

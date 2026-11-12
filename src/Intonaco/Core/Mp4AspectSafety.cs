@@ -55,17 +55,17 @@ namespace Intonaco.Core
                 FileShare.ReadWrite, bufferSize: 4096, FileOptions.SequentialScan);
 
             // Walk top-level ISO-BMFF boxes; do not read the potentially huge
-            // mdat video payload into memory.
+            // mdat video payload into memory. Allocate both headers once.
+            Span<byte> head = stackalloc byte[8];
+            Span<byte> extended = stackalloc byte[8];
             while (stream.Length - stream.Position >= 8)
             {
                 long boxStart = stream.Position;
-                Span<byte> head = stackalloc byte[8];
                 stream.ReadExactly(head);
                 ulong boxSize = BinaryPrimitives.ReadUInt32BigEndian(head[..4]);
                 int headerSize = 8;
                 if (boxSize == 1)
                 {
-                    Span<byte> extended = stackalloc byte[8];
                     stream.ReadExactly(extended);
                     boxSize = BinaryPrimitives.ReadUInt64BigEndian(extended);
                     headerSize = 16;

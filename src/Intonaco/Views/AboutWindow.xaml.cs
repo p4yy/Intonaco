@@ -34,7 +34,7 @@ namespace Intonaco.Views
             catch (Exception ex)
             {
                 MessageBox.Show(this, "Could not open the link: " + ex.Message,
-                    "Intonaco", MessageBoxButton.OK, MessageBoxImage.Information);
+                    "Intonaco Wallpaper", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
     }

@@ -1,7 +1,7 @@
 <Window x:Class="Intonaco.Views.AboutWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="About Intonaco"
+        Title="About Intonaco Wallpaper"
         Icon="/Assets/intonaco.ico"
         Width="440" Height="458"
         MinWidth="440" MinHeight="458"
@@ -40,7 +40,7 @@
                 </Viewbox>
             </Border>
             <StackPanel Margin="14,3,0,0" VerticalAlignment="Center">
-                <TextBlock Text="Intonaco" FontSize="23" FontWeight="SemiBold"
+                <TextBlock Text="Intonaco Wallpaper" FontSize="21" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextPrimaryBrush}" />
                 <TextBlock x:Name="AboutVersionText" Text="Version"
                            Style="{StaticResource CaptionText}" Margin="0,3,0,0" />
@@ -60,7 +60,7 @@
         <StackPanel Grid.Row="3">
             <Button Style="{StaticResource GhostButton}" Height="43"
                     HorizontalContentAlignment="Left" Click="OnOpenGitHub"
-                    ToolTip="Open the Intonaco source code on GitHub">
+                    ToolTip="Open the Intonaco Wallpaper source code on GitHub">
                 <DockPanel LastChildFill="True">
                     <Viewbox Width="21" Height="21" Margin="4,0,12,0"
                               Stretch="Uniform" IsHitTestVisible="False">
@@ -76,7 +76,7 @@
             <Border Height="1" Background="{DynamicResource DividerBrush}" Margin="0,1" />
             <Button Style="{StaticResource GhostButton}" Height="43"
                     HorizontalContentAlignment="Left" Click="OnOpenPayPal"
-                    ToolTip="Support Intonaco through PayPal">
+                    ToolTip="Support Intonaco Wallpaper through PayPal">
                 <DockPanel LastChildFill="True">
                     <Viewbox Width="21" Height="21" Margin="4,0,12,0"
                               Stretch="Uniform" IsHitTestVisible="False">
@@ -92,7 +92,7 @@
             <Border Height="1" Background="{DynamicResource DividerBrush}" Margin="0,1" />
             <Button Style="{StaticResource GhostButton}" Height="43"
                     HorizontalContentAlignment="Left" Click="OnOpenKoFi"
-                    ToolTip="Support Intonaco through Ko-fi">
+                    ToolTip="Support Intonaco Wallpaper through Ko-fi">
                 <DockPanel LastChildFill="True">
                     <Viewbox Width="21" Height="21" Margin="4,0,12,0"
                               Stretch="Uniform" IsHitTestVisible="False">

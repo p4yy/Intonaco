@@ -59,7 +59,7 @@ jobs:
           if ($count -eq 0) {
             $identity = 'IntonacoWallpaper.DevelopmentPreview'
             $publisher = 'CN=IntonacoWallpaperDevelopmentPreview'
-            $display = 'Intonaco Wallpaper Preview'
+            $display = 'Acev Dev Co'
             Write-Warning 'PREVIEW IDENTITY ONLY. Do not upload this artifact to Partner Center.'
           } else {
             $identity = $env:STORE_ID
@@ -70,7 +70,7 @@ jobs:
           $version = [string]($project.Project.PropertyGroup.Version |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
             Select-Object -First 1)
-          $output = "artifacts/store/IntonacoWallpaper-v$version-win-x64.msix"
+          $output = "artifacts/store/Intonaco-Wallpaper-v$version-win-x64.msix"
           & ./store/Build-StorePackage.ps1 `
             -PublishDir artifacts/store-app `
             -PackageIdentityName $identity `
@@ -81,7 +81,7 @@ jobs:
       - name: Upload unsigned MSIX artifact
         uses: actions/upload-artifact@v4
         with:
-          name: IntonacoWallpaper-MSIX-unsigned
+          name: Intonaco-Wallpaper-MSIX-unsigned
           path: artifacts/store/*.msix
           if-no-files-found: error
           retention-days: 14

@@ -72,6 +72,12 @@ if (-not $iscc) {
     throw "Inno Setup 6 (ISCC.exe) was not found. Install Inno Setup and try again."
 }
 
+# Generate both wizard images from the exact app icon on each clean build.
+# BMP works with every supported Inno Setup 6 compiler, including CI.
+& (Join-Path $PSScriptRoot "Generate-Branding.ps1")
+# The script uses PowerShell/.NET only; there is no native exit code.
+# A terminating PowerShell error is automatically promoted by Stop.
+
 $scriptPath = Join-Path $PSScriptRoot "Intonaco.iss"
 Write-Host "Building installer with $iscc"
 Write-Host "  Payload: $publishPath"
@@ -90,7 +96,7 @@ if ($compilerExitCode -ne 0) {
     throw "Inno Setup compilation failed with exit code $compilerExitCode.`n$detail"
 }
 
-$setupPath = Join-Path $outputPath "Intonaco-v$Version-win-x64-setup.exe"
+$setupPath = Join-Path $outputPath "Intonaco-Wallpaper-v$Version-win-x64-setup.exe"
 if (-not (Test-Path -LiteralPath $setupPath)) {
     throw "Installer was not created: $setupPath"
 }

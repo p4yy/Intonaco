@@ -1,6 +1,6 @@
 # Microsoft Store submission checklist
 
-Intonaco is a WPF/.NET 8 Windows desktop app. GitHub's official installer
+Intonaco Wallpaper is a WPF/.NET 8 Windows desktop app. GitHub's official installer
 and portable EXE are **distribution builds, not certified Store packages**.
 A successful Windows CI run is not a substitute for actual desktop QA or
 Microsoft Store certification.
@@ -17,13 +17,16 @@ Microsoft Store certification.
   installation/upgrade/uninstall testing.
 - The Microsoft Store re-signs submitted MSIX/AppX packages, so no separately
   purchased CA certificate is required **for Store distribution**.
-- The current GitHub CI produces Inno Setup EXE installers and portable builds,
-  **not** an MSIX package; this step is outstanding.
+- A separate Store MSIX workflow now produces an unsigned **development
+  preview** package. For an actual Store submission, rebuild with the exact
+  Partner Center Package Identity Name, Publisher distinguished name and
+  registered publisher display name. Development-preview identities are
+  **not suitable for submission**.
 
 ### Alternative: existing Inno Setup EXE installer
 
 - Submit a permanent, version-specific HTTPS **direct download** of the
-  `Intonaco-vX.Y.Z-win-x64-setup.exe` release asset. Do not use a moving
+  `Intonaco-Wallpaper-vX.Y.Z-win-x64-setup.exe` release asset. Do not use a moving
   `latest` URL, and never silently replace the bytes behind a submitted URL.
 - Microsoft requires the installer **and every included PE binary** to be
   authenticode-signed with a certificate chaining to a trusted CA. Our current

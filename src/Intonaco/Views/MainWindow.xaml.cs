@@ -320,6 +320,14 @@ namespace Intonaco.Views
             _systemEvents.Start();
             UpdateTitleBarTheme();
 
+            // Second-launch signals can arrive while StartupUri is still
+            // constructing the first window. Honour them after first layout.
+            if (Application.Current is App app && app.ConsumePendingShowRequest())
+            {
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
+                    (Action)RestoreFromSecondaryLaunch);
+            }
+
             // Upgrade old registration commands that always forced a tray
             // launch, even if the current preference wants a visible window.
 #if INTONACO_STORE
@@ -2078,6 +2086,40 @@ namespace Intonaco.Views
 
         #endregion
 
+        // Discovery remains local and offline. A copy action never redirects
+        // the user, fetches a website, or launches another application.
+        private void OnToggleWallpaperSources(object sender, RoutedEventArgs e)
+        {
+            bool expanding = WallpaperSourcesPanel.Visibility != Visibility.Visible;
+            WallpaperSourcesPanel.Visibility = expanding
+                ? Visibility.Visible : Visibility.Collapsed;
+            WallpaperSourcesChevron.Text = expanding ? "\uE70E" : "\uE70D";
+            if (!expanding)
+                WallpaperSourceCopyStatus.Text = string.Empty;
+        }
+
+        private void OnCopyWallpaperSource(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string url } ||
+                !WallpaperSources.IsApproved(url) ||
+                !Uri.TryCreate(url, UriKind.Absolute, out var parsed))
+            {
+                return;
+            }
+
+            try
+            {
+                Clipboard.SetText(url, TextDataFormat.UnicodeText);
+                WallpaperSourceCopyStatus.Text =
+                    "Copied " + parsed.Host + " to clipboard";
+            }
+            catch (ExternalException ex)
+            {
+                WallpaperSourceCopyStatus.Text = "Clipboard is unavailable. Try again.";
+                DebugLog.Write("Wallpaper source copy failed: " + ex.Message);
+            }
+        }
+
         private void OnAboutClick(object sender, RoutedEventArgs e)
         {
             new AboutWindow { Owner = this }.ShowDialog();
@@ -2143,7 +2185,16 @@ namespace Intonaco.Views
         }
 
         /// <summary>Called when a second shortcut launch asks this instance to reopen.</summary>
-        public void RestoreFromSecondaryLaunch() => ShowMainWindow();
+        public void RestoreFromSecondaryLaunch()
+        {
+            if (_isExiting)
+                return;
+
+            // Queue an existing-instance request behind layout and any
+            // in-flight minimize/close events. This handles desktop shortcut
+            // and Start menu launches the same way as the working tray action.
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, (Action)ShowMainWindow);
+        }
 
         private void ShowMainWindow()
         {

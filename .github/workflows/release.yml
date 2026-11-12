@@ -117,28 +117,23 @@ jobs:
           Copy-Item LICENSE, THIRD-PARTY-NOTICES.md publish/framework-dependent/
           Copy-Item LICENSE, THIRD-PARTY-NOTICES.md publish/self-contained/
 
-          $fd = "release/Intonaco-v$version-win-x64-framework-dependent.zip"
-          $sc = "release/Intonaco-v$version-win-x64-self-contained.zip"
+          $fd = "release/Intonaco-Wallpaper-v$version-win-x64-framework-dependent.zip"
+          $sc = "release/Intonaco-Wallpaper-v$version-win-x64-self-contained.zip"
           Compress-Archive -Path publish/framework-dependent/* -DestinationPath $fd
           Compress-Archive -Path publish/self-contained/* -DestinationPath $sc
 
           # Direct portable .exe download (the self-contained single file,
           # no unzip needed). The recommended installer was built and smoke
           # tested into this same release folder by the previous step.
-          $exe = "release/Intonaco-v$version-win-x64.exe"
+          $exe = "release/Intonaco-Wallpaper-v$version-win-x64.exe"
           Copy-Item publish/self-contained/Intonaco.exe $exe
-          $setup = "release/Intonaco-v$version-win-x64-setup.exe"
+          $setup = "release/Intonaco-Wallpaper-v$version-win-x64-setup.exe"
           if (-not (Test-Path -LiteralPath $setup)) {
             throw "Installer was not found at $setup"
           }
 
-          # Also produce plan-named aliases: Intonaco-vX-Portable.exe and Setup.exe
-          $portableAlias = "release/Intonaco-v$version-Portable.exe"
-          Copy-Item $exe $portableAlias
-          $setupAlias = "release/Intonaco-v$version-Setup.exe"
-          Copy-Item $setup $setupAlias
-
-          $lines = foreach ($file in @($setup, $fd, $sc, $exe, $portableAlias, $setupAlias)) {
+          # One installer and one portable EXE; no duplicate aliases.
+          $lines = foreach ($file in @($setup, $fd, $sc, $exe)) {
             $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $(Split-Path $file -Leaf)"
           }
@@ -149,36 +144,38 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Intonaco ${{ steps.version.outputs.tag }}
+          name: Intonaco Wallpaper ${{ steps.version.outputs.tag }}
           generate_release_notes: false
           target_commitish: ${{ github.sha }}
           body: |
-            ## Intonaco v${{ steps.version.outputs.version }}
+            ## Intonaco Wallpaper v${{ steps.version.outputs.version }}
 
-            Compact native Windows controls with safer launch and restore behavior.
+            Discover live wallpaper sources from Intonaco Wallpaper, and reliably restore from desktop shortcuts.
 
             ### Highlights
-            - Opens in a compact, tall window by default, clamped to available screen height.
-            - Manual app launches open the controls, even if Windows sign-in is configured to start silently.
-            - Minimized/tray windows restore to Normal before showing, with preview refresh after layout.
-            - Previous native UI, video handling and background efficiency improvements retained.
-            - Standalone Store MSIX preview packaging is kept separate from the GitHub installer.
+            - New, compact **Get live wallpapers** section with copyable addresses for six trusted third-party catalogs.
+            - Copy actions never auto-redirect or open a browser; supported videos are opened locally after download.
+            - Desktop shortcut re-launch signals are preserved even during initial window loading.
+            - Single-column recent items stay clean at the compact default window size.
+            - Branded installer panel uses the official Intonaco logo and lists publisher **Acev Dev Co**.
+            - No new background network activity or playback overhead.
 
             ### Download
-            - `Intonaco-v${{ steps.version.outputs.version }}-win-x64-setup.exe` — Windows installer.
-            - `Intonaco-v${{ steps.version.outputs.version }}-win-x64.exe` — portable standalone EXE.
-            - `Intonaco-v${{ steps.version.outputs.version }}-win-x64-self-contained.zip` — portable archive.
-            - `Intonaco-v${{ steps.version.outputs.version }}-win-x64-framework-dependent.zip` — requires .NET 8 Desktop Runtime.
+            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64-setup.exe` — Windows installer.
+            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64.exe` — portable standalone EXE.
+            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64-self-contained.zip` — portable archive.
+            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64-framework-dependent.zip` — requires .NET 8 Desktop Runtime.
 
             The installer and portable EXE do not require a separate .NET installation.
-            Additional `-Setup.exe` and `-Portable.exe` aliases are included.
             Check `SHA256SUMS.txt` to verify downloads.
 
             **Hardware testing:** Windows CI covers compilation, tests and installer smoke
             checks. The new MPV backend still requires real Windows hardware validation.
             It is optional and not bundled. Media codec support and memory/GPU savings
-            are hardware-dependent. Store EXE submission additionally requires trusted
-            code signing, which is not included in this build.
+            are hardware-dependent. Windows may display "Unknown publisher" until
+            the EXE or installer receives a trusted Authenticode signature.
+            The separate Store MSIX upload requires the exact Partner Center
+            package identity and publisher; no Store publication is performed here.
 
             [Changelog](https://github.com/${{ github.repository }}/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md)
             · [Verification](https://github.com/${{ github.repository }}/blob/${{ steps.version.outputs.tag }}/docs/VERIFICATION.md)

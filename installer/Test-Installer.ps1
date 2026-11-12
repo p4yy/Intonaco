@@ -51,8 +51,8 @@ $uninstaller = Join-Path $InstallDir "unins000.exe"
 
 $programsFolder = [Environment]::GetFolderPath([Environment+SpecialFolder]::Programs)
 $desktopFolder = [Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)
-$startShortcut = Join-Path $programsFolder "Intonaco.lnk"
-$desktopShortcut = Join-Path $desktopFolder "Intonaco.lnk"
+$startShortcut = Join-Path $programsFolder "Intonaco Wallpaper.lnk"
+$desktopShortcut = Join-Path $desktopFolder "Intonaco Wallpaper.lnk"
 
 $settingsDir = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) "Intonaco"
 $sentinelPath = Join-Path $settingsDir "installer-smoke-sentinel.txt"
@@ -79,7 +79,7 @@ $uninstallAttempted = $false
 
 try {
     Assert-True (-not (Test-Path -LiteralPath $startShortcut)) `
-        "An Intonaco Start Menu shortcut already exists; run this test in an isolated account."
+        "An Intonaco Wallpaper Start Menu shortcut already exists; run this test in an isolated account."
 
     if (Test-Path -LiteralPath $InstallDir) {
         Remove-Item -LiteralPath $InstallDir -Recurse -Force
@@ -97,10 +97,13 @@ try {
         "/TASKS=desktopicon"
     )
 
-    Invoke-CheckedProcess $resolvedSetup $installArguments "Installing Intonaco..."
+    Invoke-CheckedProcess $resolvedSetup $installArguments "Installing Intonaco Wallpaper..."
 
     Assert-True (Test-Path -LiteralPath $installedExe) "Installed Intonaco.exe was not found."
     Assert-True (Test-Path -LiteralPath $uninstaller) "Installed uninstaller was not found."
+    $metadata = (Get-Item -LiteralPath $installedExe).VersionInfo
+    Assert-True ($metadata.ProductName -eq "Intonaco Wallpaper") "Windows product name does not match."
+    Assert-True ($metadata.CompanyName -eq "Acev Dev Co") "Windows company metadata does not match."
     Assert-True (Test-Path -LiteralPath $startShortcut) "Start Menu shortcut was not created."
     Assert-True (Test-Path -LiteralPath $desktopShortcut) "Optional desktop shortcut was not created."
     Assert-True ((Get-Content -LiteralPath $sentinelPath -Raw) -eq $sentinelContent) `
@@ -118,7 +121,7 @@ try {
         $appProcess = $null
     }
 
-    Invoke-CheckedProcess $resolvedSetup $installArguments "Reinstalling/upgrading Intonaco..."
+    Invoke-CheckedProcess $resolvedSetup $installArguments "Reinstalling/upgrading Intonaco Wallpaper..."
     Assert-True (Test-Path -LiteralPath $installedExe) "Intonaco.exe was missing after reinstall."
     Assert-True ((Get-Content -LiteralPath $sentinelPath -Raw) -eq $sentinelContent) `
         "Reinstall changed the preserved settings sentinel."
@@ -131,7 +134,7 @@ try {
         "/VERYSILENT",
         "/SUPPRESSMSGBOXES",
         "/NORESTART"
-    ) "Uninstalling Intonaco..."
+    ) "Uninstalling Intonaco Wallpaper..."
 
     # Inno's uninstaller relaunches itself from %TEMP%; wait for file
     # removal rather than trusting only the first process exit.
