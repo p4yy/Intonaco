@@ -54,18 +54,23 @@ jobs:
             if (-not [string]::IsNullOrWhiteSpace($value)) { $count++ }
           }
           if ($count -notin @(0, 3)) {
-            throw 'Provide all three exact Partner Center identity fields or leave all blank for a preview.'
+            throw 'Provide all three identity overrides or leave all blank to use the saved Partner Center identity.'
           }
+          # Partner Center package identity is public metadata, not a secret.
+          # Keep it in one reviewed source file rather than a fake preview DN.
+          $registered = Get-Content -LiteralPath store/partner-center-identity.json -Raw |
+            ConvertFrom-Json
           if ($count -eq 0) {
-            $identity = 'IntonacoWallpaper.DevelopmentPreview'
-            $publisher = 'CN=IntonacoWallpaperDevelopmentPreview'
-            $display = 'Acev Dev Co'
-            Write-Warning 'PREVIEW IDENTITY ONLY. Do not upload this artifact to Partner Center.'
+            $identity = [string]$registered.package_identity_name
+            $publisher = [string]$registered.publisher_distinguished_name
+            $display = [string]$registered.publisher_display_name
           } else {
             $identity = $env:STORE_ID
             $publisher = $env:STORE_PUBLISHER
             $display = $env:STORE_DISPLAY_PUBLISHER
           }
+          Write-Host "Packaging Store identity: $identity (publisher: $display)"
+          Write-Host 'This CI artifact is UNSIGNED and NOT automatically submitted to Partner Center.'
           [xml]$project = Get-Content -LiteralPath src/Intonaco/Intonaco.csproj
           $version = [string]($project.Project.PropertyGroup.Version |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
@@ -81,7 +86,7 @@ jobs:
       - name: Upload unsigned MSIX artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Intonaco-Wallpaper-MSIX-unsigned
+          name: Intonaco-Wallpaper-PartnerCenter-MSIX-unsigned
           path: artifacts/store/*.msix
           if-no-files-found: error
           retention-days: 14
