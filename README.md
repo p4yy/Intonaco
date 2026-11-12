@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="docs/branding/intonaco-lockup-light.svg#gh-light-mode-only" width="360" alt="Intonaco — video wallpapers for Windows" />
-  <img src="docs/branding/intonaco-lockup-dark.svg#gh-dark-mode-only" width="360" alt="Intonaco — video wallpapers for Windows" />
+  <img src="docs/branding/intonaco-lockup-light.svg#gh-light-mode-only" width="360" alt="Intonaco Wallpaper" />
+  <img src="docs/branding/intonaco-lockup-dark.svg#gh-dark-mode-only" width="360" alt="Intonaco Wallpaper" />
 </p>
 
 <p align="center">
   <a href="https://github.com/p4yy/Intonaco/actions/workflows/ci.yml"><img alt="Build and tests" src="https://github.com/p4yy/Intonaco/actions/workflows/ci.yml/badge.svg" /></a>
-  <a href="https://github.com/p4yy/Intonaco/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/p4yy/Intonaco?display_name=tag" /></a>
+  <a href="https://github.com/p4yy/Intonaco/releases/tag/Intonaco-Wallpaper"><img alt="Download Intonaco Wallpaper" src="https://img.shields.io/badge/Download-Intonaco_Wallpaper-83DFCC" /></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-293B3A" /></a>
 </p>
 
-<p align="center"><strong>Your video. Your desktop. Nothing extra.</strong></p>
+<p align="center">Native video wallpapers for Windows 10 and 11.</p>
 
 **Intonaco Wallpaper** is a focused, open-source Windows app that plays a local video **behind your desktop icons**. It uses WPF and Windows Media Foundation instead of embedding a browser or shipping a separate media engine.
 
@@ -38,19 +38,21 @@ No accounts, wallpaper storefront, embedded browser, telemetry SDK or background
 
 ## Install
 
-Download the **Intonaco Wallpaper** installer or portable build from [GitHub Releases](https://github.com/p4yy/Intonaco/releases).
+Download the current build from the [single official release](https://github.com/p4yy/Intonaco/releases/tag/Intonaco-Wallpaper).
 
-| Download | Requirements |
+| Download | Purpose |
 | --- | --- |
-| Windows installer | Windows 10 1903+ or Windows 11; includes the required runtime |
-| Portable self-contained EXE / zip | No separate .NET installation needed |
-| Framework-dependent zip | .NET 8 Desktop Runtime |
+| [Standard installer](https://github.com/p4yy/Intonaco/releases/download/Intonaco-Wallpaper/Intonaco-Wallpaper-Setup.exe) | Windows 10/11 installation with Start menu shortcuts; .NET runtime included |
+| [Portable EXE](https://github.com/p4yy/Intonaco/releases/download/Intonaco-Wallpaper/Intonaco-Wallpaper-Portable.exe) | Run directly without an installer |
+| [Microsoft Store upload](https://github.com/p4yy/Intonaco/releases/download/Intonaco-Wallpaper/Intonaco-Wallpaper.msixupload) | Partner Center submission file; not a desktop installer |
+
+The public download names do not contain version numbers. Windows and Microsoft Store use an internal numeric version for servicing and updates.
 
 ## Native video engine and format support
 
 Intonaco has its **own lightweight native media-preparation layer**. It recognizes container signatures, validates local files, and corrects nonstandard MP4 pixel-aspect metadata without re-encoding the video. Playback then uses **Windows Media Foundation**, retaining its available hardware-assisted decoding without shipping an additional codec engine.
 
-**MLW compatibility (v2.1.3 testing candidate):** Intonaco detects .mlw
+**MLW compatibility:** Intonaco detects .mlw
 files containing standard video bytes or ZIP-wrapped playable videos,
 imports a local cached copy, and preserves the original. Protected or
 proprietary .mlw files are not yet decoded; obtain an MP4 from the original
@@ -123,9 +125,10 @@ Resource use depends on codec, resolution, GPU, monitor configuration and Window
 
 ## Microsoft Store
 
-The GitHub installer and portable EXE are Windows download builds. Microsoft
-Store publication needs a signed EXE/MSI installer or a separately packaged MSIX,
-plus real-device QA. See the [Store submission checklist](docs/MICROSOFT_STORE.md).
+The release includes a separately built and validated `.msixupload` file with
+the registered **Acev Apps Co.** package identity. Upload it in Microsoft
+Partner Center for certification; building the file does not publish the app.
+See the [Store submission checklist](docs/MICROSOFT_STORE.md).
 
 ## Project
 
