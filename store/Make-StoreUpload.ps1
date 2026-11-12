@@ -37,12 +37,15 @@ try {
     $identity = $manifest.Package.Identity
     $property = $manifest.Package.Properties
     $app = $manifest.Package.Applications.Application
+    $visual = @($app.ChildNodes | Where-Object { $_.LocalName -eq 'VisualElements' }) | Select-Object -First 1
+    if ($null -eq $visual) { throw 'MSIX application has no VisualElements.' }
+    $entryNames = @($zip.Entries | ForEach-Object { $_.FullName.Replace('\\', '/') })
     $actual = @{
         Name = [string]$identity.Name
         Publisher = [string]$identity.Publisher
         PublisherDisplay = [string]$property.PublisherDisplayName
         ProductDisplay = [string]$property.DisplayName
-        AppDisplay = [string]$app.VisualElements.DisplayName
+        AppDisplay = [string]$visual.GetAttribute('DisplayName')
     }
 
     if ($actual.Name -cne $ExpectedIdentityName) {
@@ -61,12 +64,12 @@ try {
     if ([string]$app.Executable -cne 'Intonaco.exe') {
         throw 'MSIX application executable is not the intended desktop app.'
     }
-    if ($null -eq $zip.GetEntry('Intonaco.exe')) {
+    if ('Intonaco.exe' -cnotin $entryNames) {
         throw 'MSIX is missing its Intonaco.exe payload.'
     }
     foreach ($logo in @('Assets/Logo44.png', 'Assets/Logo150.png',
                           'Assets/Logo50.png')) {
-        if ($null -eq $zip.GetEntry($logo)) {
+        if ($logo -cnotin $entryNames) {
             throw "MSIX is missing brand asset: $logo"
         }
     }
