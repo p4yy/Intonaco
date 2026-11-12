@@ -6,7 +6,7 @@
 ; reinstalls and uninstall do not delete them.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.1"
+  #define MyAppVersion "2.1.0"
 #endif
 
 #ifndef PublishDir
@@ -19,7 +19,7 @@
 
 #define MyAppName "Intonaco"
 #define MyAppPublisher "Intonaco Contributors"
-#define MyAppURL "https://github.com/77worldd/Intonaco"
+#define MyAppURL "https://github.com/p4yy/Intonaco"
 #define MyAppExeName "Intonaco.exe"
 
 [Setup]
