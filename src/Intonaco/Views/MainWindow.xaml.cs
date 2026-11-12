@@ -42,6 +42,21 @@ namespace Intonaco.Views
         private TimeSpan _rollbackPosition;
         private bool _lastVideoOpened;
         private bool _previewNeedsPositionSync;
+        private bool _previewOpened;
+        private bool _previewPlayRequested;
+        private string? _previewFailedPath;
+        private bool? _livePreviewOverride;
+
+        // WPF decodes the preview independently at source resolution.
+        // Keep the second decoder disabled automatically for 4K content.
+        // Users can enable it explicitly for the current wallpaper.
+        internal static bool CanAutoPreview(int width, int height) =>
+            width > 0 && height > 0 &&
+            (long)width * height <= 2560L * 1440L;
+
+        private bool IsLivePreviewEnabled =>
+            _livePreviewOverride ?? CanAutoPreview(
+                _player.NaturalVideoWidth, _player.NaturalVideoHeight);
 
         /// <summary>
         /// Extensions offered by the file dialog. Validation itself is done by
@@ -851,8 +866,9 @@ namespace Intonaco.Views
 
         // A separate video decoder is useful only while the user is actually
         // interacting with Intonaco. Release it when switching applications.
+        // Losing keyboard focus must NEVER close and reopen the video decoder.
         private bool IsPreviewWindowVisible =>
-            IsVisible && WindowState != WindowState.Minimized && IsActive;
+            IsVisible && WindowState != WindowState.Minimized;
 
         private void OnMainWindowActivityChanged(object? sender, EventArgs e)
         {
@@ -879,13 +895,51 @@ namespace Intonaco.Views
         private void UpdatePreview(string filePath)
         {
             _previewFilePath = filePath;
+            _previewFailedPath = null;
+            _livePreviewOverride = null;
             RefreshPreviewForCurrentState();
+        }
+
+        private void OnToggleLivePreview(object sender, RoutedEventArgs e)
+        {
+            if (_previewFailedPath != null)
+            {
+                _previewFailedPath = null;
+                _livePreviewOverride = true;
+            }
+            else
+            {
+                _livePreviewOverride = !IsLivePreviewEnabled;
+            }
+            RefreshPreviewForCurrentState();
+        }
+
+        private void ShowPreviewMessage(string message)
+        {
+            PreviewImage.Source = null;
+            PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewMedia.Visibility = Visibility.Collapsed;
+            PreviewHintText.Text = message;
+            PreviewPlaceholder.Visibility = Visibility.Visible;
+        }
+
+        private void UpdatePreviewToggle()
+        {
+            PreviewToggleButton.Visibility =
+                _previewFilePath != null && _player is not MpvWallpaperPlayer
+                    ? Visibility.Visible : Visibility.Collapsed;
+            PreviewToggleButton.Content = _previewFailedPath != null
+                ? "Retry preview"
+                : IsLivePreviewEnabled ? "Pause preview" : "Show preview";
         }
 
         private void ClearPreview()
         {
             _previewFilePath = null;
+            _previewFailedPath = null;
+            _livePreviewOverride = null;
             _previewNeedsPositionSync = false;
+            PreviewToggleButton.Visibility = Visibility.Collapsed;
             ReleasePreviewPipeline();
             PreviewImage.Source = null;
             PreviewImage.Visibility = Visibility.Collapsed;
@@ -901,34 +955,50 @@ namespace Intonaco.Views
         /// </summary>
         private void RefreshPreviewForCurrentState()
         {
-            // MPV's desktop surface is the only MPV decoder. Avoid starting
-            // a separate MediaElement that may not understand MPV-only codecs.
+            UpdatePreviewToggle();
+            // MPV has its own decoder and cannot share frames with WPF.
+            // Never launch a second incompatible player as a faux preview.
             if (_player is MpvWallpaperPlayer)
             {
                 ReleasePreviewPipeline();
-                PreviewImage.Source = null;
-                PreviewImage.Visibility = Visibility.Collapsed;
-                PreviewPlaceholder.Visibility = Visibility.Visible;
-                PreviewHintText.Text =
-                    "MPV renders on your desktop without a second preview decoder.";
-                return;
-            }
-            if (_previewFilePath == null)
-            {
-                ReleasePreviewPipeline();
-                PreviewImage.Source = null;
-                PreviewImage.Visibility = Visibility.Collapsed;
-                PreviewPlaceholder.Visibility = Visibility.Visible;
+                ShowPreviewMessage("MPV plays on your desktop. No extra decoder is running.");
                 return;
             }
 
-            PreviewPlaceholder.Visibility = Visibility.Collapsed;
+            if (_previewFilePath == null)
+            {
+                ReleasePreviewPipeline();
+                ShowPreviewMessage("Drop a video here or choose a file.");
+                return;
+            }
 
             if (!IsPreviewWindowVisible)
             {
                 ReleasePreviewPipeline();
-                PreviewImage.Source = null;
-                PreviewImage.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            if (_previewFailedPath != null)
+            {
+                ReleasePreviewPipeline();
+                ShowPreviewMessage("Preview unavailable. Wallpaper playback is independent. Try Retry preview.");
+                return;
+            }
+
+            // Hold off until the desktop decoder reports real dimensions.
+            // Without this guard every 4K file started a costly second decoder
+            // before the auto-preview limit could take effect.
+            if (_player.NaturalVideoWidth <= 0 || _player.NaturalVideoHeight <= 0)
+            {
+                ReleasePreviewPipeline();
+                ShowPreviewMessage("Preparing wallpaper on desktop…");
+                return;
+            }
+
+            if (!IsLivePreviewEnabled)
+            {
+                ReleasePreviewPipeline();
+                ShowPreviewMessage("Live preview is off to keep wallpaper playback smooth.");
                 return;
             }
 
@@ -942,8 +1012,7 @@ namespace Intonaco.Views
                     break;
                 default:
                     ReleasePreviewPipeline();
-                    PreviewImage.Source = null;
-                    PreviewImage.Visibility = Visibility.Collapsed;
+                    ShowPreviewMessage("Wallpaper is stopped.");
                     break;
             }
         }
@@ -951,82 +1020,84 @@ namespace Intonaco.Views
         private void StartPreview()
         {
             if (_previewFilePath == null || !IsPreviewWindowVisible ||
+                !IsLivePreviewEnabled ||
                 _player.CurrentState != WallpaperPlayer.PlaybackState.Playing)
-            {
                 return;
-            }
 
             try
             {
                 bool sourceChanged = PreviewMedia.Source == null ||
-                    !string.Equals(
-                        PreviewMedia.Source.LocalPath,
-                        _previewFilePath,
-                        StringComparison.OrdinalIgnoreCase);
+                    !string.Equals(PreviewMedia.Source.LocalPath,
+                        _previewFilePath, StringComparison.OrdinalIgnoreCase);
 
                 if (sourceChanged)
                 {
                     ReleasePreviewPipeline();
                     PreviewMedia.Source = new Uri(_previewFilePath, UriKind.Absolute);
                     _previewNeedsPositionSync = true;
+                    _previewOpened = false;
+                    ShowPreviewMessage("Loading preview…");
                 }
 
                 PreviewMedia.Stretch = _player.StretchMode;
                 PreviewMedia.SpeedRatio = _player.PlaybackSpeed;
                 ApplyPreviewFrameRateCap(_settings.TargetFps);
                 PreviewMedia.IsMuted = true;
-                // A resume must not reset the preview: the same source is
-                // simply told to play again from its current frame.
-                PreviewMedia.Play();
-                PreviewMedia.Visibility = Visibility.Visible;
-                PreviewImage.Source = null;
-                PreviewImage.Visibility = Visibility.Collapsed;
-                PreviewPlaceholder.Visibility = Visibility.Collapsed;
+                // Do not restart an already-running decoder on every activation,
+                // placement, slider or state refresh.
+                if (!_previewPlayRequested)
+                {
+                    PreviewMedia.Play();
+                    _previewPlayRequested = true;
+                }
+
+                if (_previewOpened)
+                {
+                    PreviewMedia.Visibility = Visibility.Visible;
+                    PreviewPlaceholder.Visibility = Visibility.Collapsed;
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                ClearPreview();
+                DebugLog.Write("Preview start failed: " + ex.Message);
+                _previewFailedPath = _previewFilePath;
+                ReleasePreviewPipeline();
+                ShowPreviewMessage("Preview could not open this video. The desktop player is separate.");
+                UpdatePreviewToggle();
             }
         }
 
         private void ShowPausedPreview()
         {
-            // The preview uses the same rule as the desktop: stop animation
-            // updates, keep the rendering surface. Photographing a WPF
-            // MediaElement into a bitmap and closing it is exactly what put
-            // black bands/blocks around a paused background.
             PreviewImage.Source = null;
             PreviewImage.Visibility = Visibility.Collapsed;
-            PreviewPlaceholder.Visibility = Visibility.Collapsed;
 
             if (PreviewMedia.Source != null)
             {
                 try
                 {
-                    PreviewMedia.Stretch = _player.StretchMode;
                     PreviewMedia.Pause();
-                    PreviewMedia.Visibility = Visibility.Visible;
+                    _previewPlayRequested = false;
+                    PreviewMedia.Visibility = _previewOpened
+                        ? Visibility.Visible : Visibility.Collapsed;
+                    PreviewPlaceholder.Visibility = _previewOpened
+                        ? Visibility.Collapsed : Visibility.Visible;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    DebugLog.Write("Paused preview failed: " + ex.Message);
                     StartPausedPreview();
                 }
                 return;
             }
 
-            // The preview pipeline was released while the window was hidden;
-            // reopen it at the desktop's paused position, still paused.
             StartPausedPreview();
         }
 
-        /// <summary>
-        /// Opens the preview source without starting its clock. MediaOpened
-        /// seeks it to the desktop position and pauses it, so a paused
-        /// wallpaper never animates in the preview either.
-        /// </summary>
         private void StartPausedPreview()
         {
-            if (_previewFilePath == null || !IsPreviewWindowVisible)
+            if (_previewFilePath == null || !IsPreviewWindowVisible ||
+                !IsLivePreviewEnabled)
                 return;
 
             try
@@ -1038,80 +1109,113 @@ namespace Intonaco.Views
                 PreviewMedia.SpeedRatio = _player.PlaybackSpeed;
                 ApplyPreviewFrameRateCap(_settings.TargetFps);
                 PreviewMedia.IsMuted = true;
-                PreviewMedia.Visibility = Visibility.Visible;
-                PreviewMedia.Pause();
+                // Prime the native media pipeline; MediaOpened seeks and
+                // immediately pauses before exposing the preview surface.
+                PreviewMedia.Play();
+                _previewPlayRequested = true;
+                ShowPreviewMessage("Preparing paused preview…");
             }
-            catch
+            catch (Exception ex)
             {
+                DebugLog.Write("Paused preview open failed: " + ex.Message);
+                _previewFailedPath = _previewFilePath;
                 ReleasePreviewPipeline();
+                ShowPreviewMessage("Paused preview unavailable.");
+                UpdatePreviewToggle();
             }
         }
 
         private void ReleasePreviewPipeline()
         {
+            // Calling Stop/Close on every focus event was expensive and could
+            // leave the MediaElement black during the next activation.
+            if (PreviewMedia.Source == null && !_previewPlayRequested &&
+                !_previewOpened)
+            {
+                PreviewMedia.Visibility = Visibility.Collapsed;
+                return;
+            }
             try
             {
                 PreviewMedia.Stop();
                 PreviewMedia.Source = null;
                 PreviewMedia.Close();
             }
-            catch { }
-
+            catch (Exception ex)
+            {
+                DebugLog.Write("Preview cleanup: " + ex.Message);
+            }
+            _previewOpened = false;
+            _previewPlayRequested = false;
+            _previewNeedsPositionSync = false;
             PreviewMedia.Visibility = Visibility.Collapsed;
+        }
+
+        private void OnPreviewMediaFailed(object sender, ExceptionRoutedEventArgs e)
+        {
+            DebugLog.Write("Preview decoder failed: " +
+                (e.ErrorException?.Message ?? "unknown media error"));
+            _previewFailedPath = _previewFilePath;
+            ReleasePreviewPipeline();
+            ShowPreviewMessage("This file cannot be previewed by Windows. Desktop playback may still work.");
+            UpdatePreviewToggle();
         }
 
         private void OnPreviewMediaOpened(object sender, RoutedEventArgs e)
         {
+            // MediaOpened fires before the first frame; do not show a blank
+            // surface if Windows reports no decoded video track.
+            if (_previewFilePath == null ||
+                PreviewMedia.NaturalVideoWidth <= 0 ||
+                PreviewMedia.NaturalVideoHeight <= 0)
+            {
+                _previewFailedPath = _previewFilePath;
+                ReleasePreviewPipeline();
+                ShowPreviewMessage("No playable video track for this preview.");
+                UpdatePreviewToggle();
+                return;
+            }
+
+            _previewOpened = true;
             if (_player.CurrentState == WallpaperPlayer.PlaybackState.Paused)
             {
-                // A preview reopened while paused must show the desktop's
-                // frozen frame and must never start animating.
                 try
                 {
                     if (_previewNeedsPositionSync &&
                         _player.Position > TimeSpan.FromMilliseconds(500))
-                    {
                         PreviewMedia.Position = _player.Position;
-                    }
                     PreviewMedia.Pause();
+                    _previewPlayRequested = false;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Keeping the first frame is preferable to a black preview.
+                    DebugLog.Write("Preview paused seek failed: " + ex.Message);
                 }
 
                 _previewNeedsPositionSync = false;
-                PreviewMedia.Visibility = IsPreviewWindowVisible
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-                return;
             }
-
-            if (!_previewNeedsPositionSync)
-                return;
-
-            _previewNeedsPositionSync = false;
-
-            if (!IsPreviewWindowVisible ||
-                _player.CurrentState != WallpaperPlayer.PlaybackState.Playing)
+            else if (_previewNeedsPositionSync &&
+                     _player.CurrentState == WallpaperPlayer.PlaybackState.Playing)
             {
-                return;
-            }
-
-            try
-            {
-                TimeSpan desktopPosition = _player.Position;
-                if (desktopPosition > TimeSpan.FromMilliseconds(500) &&
-                    (PreviewMedia.Position - desktopPosition).Duration() >
-                        TimeSpan.FromMilliseconds(500))
+                _previewNeedsPositionSync = false;
+                try
                 {
-                    PreviewMedia.Position = desktopPosition;
+                    TimeSpan desktopPosition = _player.Position;
+                    if (desktopPosition > TimeSpan.FromMilliseconds(500) &&
+                        (PreviewMedia.Position - desktopPosition).Duration() >
+                            TimeSpan.FromMilliseconds(500))
+                        PreviewMedia.Position = desktopPosition;
+                }
+                catch (Exception ex)
+                {
+                    DebugLog.Write("Preview position synchronization failed: " +
+                        ex.Message);
                 }
             }
-            catch
-            {
-                // The two MediaElements do not need sample-accurate sync.
-            }
+            PreviewMedia.Visibility = IsPreviewWindowVisible
+                ? Visibility.Visible : Visibility.Collapsed;
+            PreviewPlaceholder.Visibility = IsPreviewWindowVisible
+                ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void OnPreviewMediaEnded(object sender, RoutedEventArgs e)
@@ -1119,16 +1223,18 @@ namespace Intonaco.Views
             if (!IsPreviewWindowVisible ||
                 _player.CurrentState != WallpaperPlayer.PlaybackState.Playing ||
                 !_settings.LoopPlayback)
-            {
                 return;
-            }
 
             try
             {
                 PreviewMedia.Position = TimeSpan.Zero;
                 PreviewMedia.Play();
+                _previewPlayRequested = true;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Preview loop failed: " + ex.Message);
+            }
         }
 
         private void OnMainWindowVisibleChanged(
@@ -1923,6 +2029,9 @@ namespace Intonaco.Views
 
                 _lastVideoOpened = true;
                 _rollbackOriginalPath = null;
+                // Dimensions are now known: enable one preview decoder only
+                // for manageable sources, not for every 4K wallpaper.
+                RefreshPreviewForCurrentState();
                 FileInfoText.Text = info;
                 RefreshRecentWallpapers();
                 RefreshSeekProgress();
