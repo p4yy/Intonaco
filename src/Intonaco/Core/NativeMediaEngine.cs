@@ -132,11 +132,16 @@ namespace Intonaco.Core
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // No per-frame work or external executable. Both lightweight
-            // container inspection and optional metadata correction happen
-            // away from the WPF dispatcher.
+            // Handle MLW only when it is transparently a video or
+            // ZIP-wrapped video. Proprietary variants fail with a precise
+            // error instead of being passed to Media Foundation as garbage.
+            string playablePath = await MlwMediaSupport.PrepareAsync(
+                path, cancellationToken).ConfigureAwait(false);
+
+            // Container inspection and optional metadata correction happen
+            // away from the WPF dispatcher; never block UI while copying.
             Container container = await Task.Run(
-                () => IdentifyContainer(path), cancellationToken)
+                () => IdentifyContainer(playablePath), cancellationToken)
                 .ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -145,7 +150,7 @@ namespace Intonaco.Core
                     "This file contains an animated image, not a video stream.");
 
             PreparedWallpaper prepared = await Task.Run(
-                () => Mp4AspectSafety.PrepareAsync(path), cancellationToken)
+                () => Mp4AspectSafety.PrepareAsync(playablePath), cancellationToken)
                 .ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
