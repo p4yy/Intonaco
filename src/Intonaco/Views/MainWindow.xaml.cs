@@ -107,6 +107,10 @@ namespace Intonaco.Views
             _systemEvents = new SystemEventMonitor();
 
             InitializeComponent();
+            // The default window is intentionally narrow and tall, as shown in
+            // the Store screenshots. Keep it inside the usable screen area on
+            // laptops and displays with scaling or a larger taskbar.
+            Height = CalculateInitialWindowHeight(SystemParameters.WorkArea.Height, MinHeight);
             RecentList.ItemsSource = _recentWallpapers;
 
             // Footer version comes from the assembly, so it can never drift
@@ -163,6 +167,12 @@ namespace Intonaco.Views
                 DebugLog.Write($"AutoPlay: last wallpaper not found: {_settings.LastWallpaperPath}");
             }
         }
+
+        // WPF dimensions are device-independent units. Clamp only the startup
+        // height; resizing/maximizing remains fully supported afterward.
+        internal static double CalculateInitialWindowHeight(
+            double workAreaHeight, double minHeight) =>
+            Math.Max(minHeight, Math.Min(1080, workAreaHeight - 24));
 
         private static IWallpaperPlayer CreatePlayer(string backend) =>
             AppSettings.NormalizeBackend(backend) == "MPV"
