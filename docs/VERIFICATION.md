@@ -221,26 +221,24 @@ for repeatable comparisons:
 
 ## Known limitations
 
-- **Frame-rate cap applies to presentation, not to decoding.** v2.0.0 writes
-  `Timeline.DesiredFrameRate` onto the wallpaper `MediaElement` (30 fps →
-  ~33.3 ms interval, 60 fps → cleared/uncapped) and runs a
-  `CompositionTarget.Rendering` gate that measures and logs the achieved
-  presentation rate (`Frame-rate gate: target 30 fps, measured presentation …`
-  in `debug.log`). That measurably reduces composition/GPU work versus an
-  uncapped 60 fps session, but the hardware decoder still decodes the
-  container at its native rate. A hard per-frame *decode* cap would require a
-  custom Media Foundation pipeline with manual presentation. Use the
-  auto-pause and Pause features for the large resource wins.
+- **Frame-rate setting is a WPF presentation hint, not a decoder limit.**
+  In Windows mode, `Timeline.DesiredFrameRate` is applied without a
+  continuous `CompositionTarget.Rendering` polling hook. The underlying
+  decoder can still consume resources at the source frame cadence; do not
+  claim measured FPS or CPU savings based on the setting alone.
+  MPV uses the source cadence and disables this Windows-mode control.
+  Benchmark with real clips and hardware for resource-use claims.
 - Pause keeps the Media Foundation source open so the last decoded frame
   stays on the native video surface. Decoder buffers therefore remain
   allocated while paused, although the media clock is stopped and no new
   frames are decoded or presented. This is deliberate: closing the source
   or swapping it for a WPF bitmap is what produced the black borders.
   Stop fully releases the source.
-- Format support is bounded by installed Windows codecs (HEVC needs the
-  HEVC Video Extensions). Containers with no Media Foundation demuxer at all
-  (`.flv`, `.rmvb`, `.vob`, `.ogv`, …) are rejected up front by
-  `MediaFormatProbe` with an actionable message instead of a black desktop.
+- In the default Windows backend, supported codecs and containers depend
+  on the installed Media Foundation components (for example, HEVC may need
+  additional Windows codec support). Intonaco recognizes some uncommon
+  container extensions without promising decoding. The optional MPV backend
+  supports additional containers through a separately installed MPV build.
 - Foreground auto-pause polls `GetForegroundWindow()` every 1.2 s, so a
   focus change can take up to ~1.2 s to suspend playback (and the same to
   resume). Borderless/fullscreen-exclusive games that do not take the
@@ -275,12 +273,40 @@ be verified on Windows hardware** with the installed Media Foundation codecs.
    not be misclassified as the malformed 4K source.
 7. Start a metadata-correction operation and choose a different wallpaper,
    or press Stop. Confirm the latest requested wallpaper wins.
-8. Monitor CPU, RAM and GPU with the same clip while settings are visible,
-   minimized, playing and paused. No extra codec engine or helper process
-   should run. Check that idle CPU use falls when paused.
+8. Monitor CPU, RAM and GPU with identical clips while settings are
+   visible, minimized, playing and paused. Windows mode must launch no
+   external player process; MPV mode should run exactly one MPV process.
+   Confirm the MPV mode does not decode a second UI-preview copy.
 9. Confirm drag-and-drop, file picker and recent-wallpaper list are
    consistent, and that unsupported image animation formats are not
    advertised as playable videos.
-10. Review packaged files: no FFmpeg executable or additional third-party
-    codec binaries should be included.
+10. Review packaged files: no FFmpeg or MPV executable or codec libraries
+    should be included. Verify the download size against the Windows-only build.
+
+## Optional MPV backend smoke test
+
+This is a separate Windows hardware test, **not** a claim that automated CI
+can verify video playback on the desktop.
+
+1. Without MPV, confirm the default Windows engine starts normally and
+   choosing the optional MPV engine shows an actionable installation hint.
+2. Install an MPV build with all its required DLLs, select **MPV (optional)**
+   and apply H.264 MKV and a VP9/AV1 WebM clip. Verify the video appears
+   behind Explorer desktop icons rather than in a floating window.
+3. Check that cover/fill and fit preserve aspect ratio on 1080p, 4K, and
+   ultrawide monitors. Confirm no flicker or stretched output after resize.
+4. Pause manually, resume, seek, mute/unmute, change volume and speed, stop,
+   loop and apply another file. No duplicate MPV subprocess should remain.
+5. Switch MPV → Windows → MPV while a wallpaper is active. Verify each
+   engine releases the previous one and settings persist across restart.
+6. Minimize settings to tray. Confirm the optional MPV backend never starts
+   a second Windows MediaElement decoder for the settings preview.
+7. Restart Explorer; confirm that desktop attachment and paused state can
+   recover without leaving an orphan MPV process.
+8. If an MPV executable is removed or crashes, confirm that Intonaco shows
+   a useful error, does not crash itself, and retains or restores a known
+   working wallpaper when possible.
+9. Compare working-set, GPU usage, startup time and energy consumption with
+   the **same** video and hardware in both engines. Do not claim either
+   is universally lighter without measurement.
 
