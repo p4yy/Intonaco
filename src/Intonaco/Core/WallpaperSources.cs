@@ -15,6 +15,8 @@ namespace Intonaco.Core
             "https://motionbgs.com/",
             "https://mylivewallpapers.com/",
             "https://moewalls.com/",
+            "https://wallpaperwaifu.com/",
+            "https://lwp.gg/",
             "https://www.pexels.com/search/videos/loop/"
         };
 
