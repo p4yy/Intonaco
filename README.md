@@ -52,12 +52,26 @@ Intonaco has its **own lightweight native media-preparation layer**. It recogniz
 
 **Common containers:** MP4, M4V, MOV, MKV, WebM, AVI, WMV, ASF, MPEG, MPEG-TS, M2TS and 3GP. Intonaco also allows opening uncommon video containers such as FLV, OGV, RMVB and MXF, but **those are not guaranteed to play**. Both container support and the video/audio codec must be available through Windows Media Foundation. MKV is a container, not a codec.
 
-- **No FFmpeg dependency:** no bundled codec libraries, external conversion executables, browser runtime, downloads, or playback subprocesses.
+- **Small default build:** MPV/FFmpeg libraries are not bundled; Windows Media Foundation plays videos with no external playback process.
 - **No quality loss:** normal playback reads the original file; the rare MP4 aspect-ratio repair modifies only metadata in a separate cached copy, leaving video samples and your original file unchanged.
 - **Safe by default:** no automatic lossy transcode; unsupported codecs produce a clear explanation, and Intonaco can restore the last working wallpaper rather than leaving a black desktop.
-- **Video-only input:** animated GIF, animated WebP and APNG are not yet supported by the native video renderer and are not advertised as compatible video files.
+- **Video-only input:** animated GIF, animated WebP and APNG are not yet supported by the native video renderer. The MPV backend is intended for video formats, not animated image playback.
 
-**Important:** A small native app cannot decode *every codec* on its own. For maximum compatibility, use **H.264 MP4**. For other containers, install Windows Media Foundation-compatible codecs when required. We do not claim unsupported codecs are playable or that this implementation replaces FFmpeg's global codec coverage.
+**Important:** A small native app cannot decode *every codec* on its own. For maximum compatibility without optional components, use **H.264 MP4**. For other containers, install compatible Windows codecs or enable the optional MPV player described below.
+
+## Optional MPV backend
+
+If Windows cannot decode an MKV, WebM, AVI or other video, Intonaco can use a **separately installed MPV media player**. MPV uses FFmpeg libraries internally; Intonaco **does not bundle them or add them to the native build**.
+
+1. Download a Windows MPV build from [mpv.io/installation](https://mpv.io/installation/) or an official linked Windows provider.
+2. Keep the MPV installation together with its required DLL files. Add the folder containing `mpv.exe` to your system `PATH`, put the complete portable MPV distribution beside Intonaco, or set `INTONACO_MPV` to the full path of `mpv.exe`.
+3. Open **Playback settings → Video engine → MPV (optional)**. Selecting MPV without a detectable executable leaves Windows selected and explains what is missing.
+
+The MPV player is embedded as a native child of the existing desktop wallpaper window. Play, pause, resume, seek, volume, loop and aspect-preserving Fill/Fit use local JSON IPC. Hardware decoding is requested when supported by the GPU and MPV installation.
+
+**Resource-saving behavior:** only one desktop backend runs at a time. The MPV setting prevents a second Windows video decoder from being started for the settings preview. There is no continuously running conversion process and no MPV process at all in Windows mode. MPV uses the source's frame cadence; the Windows-mode FPS preference does not apply to MPV.
+
+Native Windows remains the default. Video engine compatibility, output quality and CPU/GPU usage should be measured on your machine before choosing one for daily use. The installer remains independent of MPV, so you can always use Intonaco without it.
 
 ## Use
 
