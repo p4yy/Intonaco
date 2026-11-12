@@ -2101,8 +2101,8 @@ namespace Intonaco.Views
         private void OnCopyWallpaperSource(object sender, RoutedEventArgs e)
         {
             if (sender is not Button { Tag: string url } ||
-                !Uri.TryCreate(url, UriKind.Absolute, out var parsed) ||
-                parsed.Scheme != Uri.UriSchemeHttps)
+                !WallpaperSources.IsApproved(url) ||
+                !Uri.TryCreate(url, UriKind.Absolute, out var parsed))
             {
                 return;
             }
