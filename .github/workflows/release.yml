@@ -1,188 +1,159 @@
-name: Release
+name: Release Intonaco Wallpaper
 
 on:
   push:
-    branches: ["main"]
-    tags: ["v*"]
+    branches: [main]
     paths:
       - "src/Intonaco/Intonaco.csproj"
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Existing tag to build a release for (e.g. v1.0.0)"
-        required: true
-        type: string
 
 permissions:
   contents: write
 
 jobs:
   release:
-    name: Publish official release
+    name: Build and verify all three packages
     runs-on: windows-latest
-
     steps:
       - name: Check out
         uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
-      - name: Resolve version
+      - name: Resolve internal servicing version
         id: version
         shell: pwsh
         run: |
-          if ("${{ github.event_name }}" -eq "push" -and "${{ github.ref_type }}" -eq "branch") {
-            [xml]$project = Get-Content -LiteralPath src/Intonaco/Intonaco.csproj
-            $version = [string]($project.Project.PropertyGroup.Version |
-              Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-              Select-Object -First 1)
-            if ($version -notmatch '^\d+\.\d+\.\d+$') {
-              throw "Invalid release version in Intonaco.csproj: $version"
-            }
-            $tag = "v$version"
+          [xml]$project = Get-Content src/Intonaco/Intonaco.csproj
+          $version = [string]($project.Project.PropertyGroup.Version |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -First 1)
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid internal package version: $version"
           }
-          else {
-            $tag = "${{ inputs.tag || github.ref_name }}"
-            if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
-              throw "Release tag '$tag' must look like v2.1.0"
-            }
-            $version = $tag.Substring(1)
-          }
-          "tag=$tag" >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
-          Write-Host "Building release $tag"
+          "tag=Intonaco-Wallpaper" >> $env:GITHUB_OUTPUT
 
       - name: Restore
         run: dotnet restore Intonaco.sln
 
       - name: Build
-        run: >-
-          dotnet build Intonaco.sln -c Release --no-restore
-          /p:Version=${{ steps.version.outputs.version }}
+        run: dotnet build Intonaco.sln -c Release --no-restore /p:Version=${{ steps.version.outputs.version }}
 
-      - name: Test
+      - name: Run regression tests
         run: dotnet test Intonaco.sln -c Release --no-build
 
-      - name: Publish (framework-dependent, single file)
+      - name: Publish portable single-file EXE
         run: >-
           dotnet publish src/Intonaco/Intonaco.csproj -c Release -r win-x64
-          --self-contained false -o publish/framework-dependent
+          --self-contained true -o publish/portable
           /p:Version=${{ steps.version.outputs.version }}
 
-      - name: Publish (self-contained, single file)
-        run: >-
-          dotnet publish src/Intonaco/Intonaco.csproj -c Release -r win-x64
-          --self-contained true -o publish/self-contained
-          /p:Version=${{ steps.version.outputs.version }}
-
-      - name: Publish installer payload (self-contained, ReadyToRun)
+      - name: Publish installer payload
         run: >-
           dotnet publish src/Intonaco/Intonaco.csproj -c Release -r win-x64
           --self-contained true -o publish/installer-app
           /p:Version=${{ steps.version.outputs.version }}
           /p:PublishSingleFile=false /p:PublishReadyToRun=true
 
-      - name: Build and smoke test Windows installer
+      - name: Create and smoke-test EXE installer
         shell: pwsh
         run: |
-          try {
-            Copy-Item LICENSE, THIRD-PARTY-NOTICES.md publish/installer-app/
-
-            $setup = & ./installer/Build-Installer.ps1 `
-              -PublishDir publish/installer-app `
-              -Version "${{ steps.version.outputs.version }}" `
-              -OutputDir release
-
-            & ./installer/Test-Installer.ps1 -SetupPath $setup
+          Copy-Item LICENSE, THIRD-PARTY-NOTICES.md publish/installer-app/
+          $setup = & ./installer/Build-Installer.ps1 `
+            -PublishDir publish/installer-app `
+            -Version "${{ steps.version.outputs.version }}" `
+            -OutputDir release
+          & ./installer/Test-Installer.ps1 -SetupPath $setup
+          if (-not (Test-Path release/Intonaco-Wallpaper-Setup.exe)) {
+            throw 'Final EXE installer was not created.'
           }
-          catch {
-            $detail = ("$($_.Exception.Message)`n$($_.ScriptStackTrace)" -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A')
-            Write-Host "::error title=Installer build/smoke test failed::$detail"
-            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "### Installer build/smoke test failed`n`n``````text`n$($_.Exception.Message)`n$($_.ScriptStackTrace)`n``````"
-            throw
+          Copy-Item publish/portable/Intonaco.exe release/Intonaco-Wallpaper-Portable.exe
+          if (-not (Test-Path release/Intonaco-Wallpaper-Portable.exe)) {
+            throw 'Final portable EXE was not created.'
           }
 
-      - name: Package zips and checksums
+      - name: Restore Microsoft Store dependencies
         shell: pwsh
         run: |
-          $version = "${{ steps.version.outputs.version }}"
-          New-Item -ItemType Directory -Force release | Out-Null
+          dotnet restore src/Intonaco/Intonaco.csproj /p:StoreBuild=true
+          if ($LASTEXITCODE -ne 0) { throw 'Store restore failed.' }
 
-          # Ship the license/notices next to the executable.
-          Copy-Item LICENSE, THIRD-PARTY-NOTICES.md publish/framework-dependent/
-          Copy-Item LICENSE, THIRD-PARTY-NOTICES.md publish/self-contained/
+      - name: Publish Microsoft Store application
+        shell: pwsh
+        run: |
+          dotnet publish src/Intonaco/Intonaco.csproj -c Release -r win-x64 --self-contained true /p:StoreBuild=true /p:PublishSingleFile=false /p:PublishReadyToRun=true -o artifacts/store-app
+          if ($LASTEXITCODE -ne 0) { throw 'Store publish failed.' }
 
-          $fd = "release/Intonaco-Wallpaper-v$version-win-x64-framework-dependent.zip"
-          $sc = "release/Intonaco-Wallpaper-v$version-win-x64-self-contained.zip"
-          Compress-Archive -Path publish/framework-dependent/* -DestinationPath $fd
-          Compress-Archive -Path publish/self-contained/* -DestinationPath $sc
+      - name: Build and verify Partner Center MSIX upload
+        shell: pwsh
+        run: |
+          $identity = Get-Content store/partner-center-identity.json -Raw | ConvertFrom-Json
+          ./store/Build-StorePackage.ps1 `
+            -PublishDir artifacts/store-app `
+            -PackageIdentityName $identity.package_identity_name `
+            -PublisherDistinguishedName $identity.publisher_distinguished_name `
+            -PublisherDisplayName $identity.publisher_display_name `
+            -Version "${{ steps.version.outputs.version }}.0" `
+            -OutputPath release/Intonaco-Wallpaper.msix
+          ./store/Make-StoreUpload.ps1 `
+            -MsixPath release/Intonaco-Wallpaper.msix `
+            -ExpectedIdentityName $identity.package_identity_name `
+            -ExpectedPublisherDn $identity.publisher_distinguished_name `
+            -ExpectedPublisherDisplayName $identity.publisher_display_name
+          Remove-Item release/Intonaco-Wallpaper.msix -Force
 
-          # Direct portable .exe download (the self-contained single file,
-          # no unzip needed). The recommended installer was built and smoke
-          # tested into this same release folder by the previous step.
-          $exe = "release/Intonaco-Wallpaper-v$version-win-x64.exe"
-          Copy-Item publish/self-contained/Intonaco.exe $exe
-          $setup = "release/Intonaco-Wallpaper-v$version-win-x64-setup.exe"
-          if (-not (Test-Path -LiteralPath $setup)) {
-            throw "Installer was not found at $setup"
+      - name: Verify exactly three public downloads
+        shell: pwsh
+        run: |
+          $expected = @(
+            'Intonaco-Wallpaper-Setup.exe',
+            'Intonaco-Wallpaper-Portable.exe',
+            'Intonaco-Wallpaper.msixupload'
+          )
+          $actual = @(Get-ChildItem release -File | ForEach-Object Name)
+          foreach ($item in $expected) {
+            if ($item -cnotin $actual) { throw "Missing download: $item" }
           }
-
-          # One installer and one portable EXE; no duplicate aliases.
-          $lines = foreach ($file in @($setup, $fd, $sc, $exe)) {
-            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
-            "$hash  $(Split-Path $file -Leaf)"
+          if (@($actual).Count -ne 3) {
+            throw "Unexpected release files: $($actual -join ', ')"
           }
-          $lines | Set-Content release/SHA256SUMS.txt -Encoding ascii
+          $checksums = foreach ($item in $expected) {
+            $hash = (Get-FileHash ("release/" + $item) -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $item"
+          }
+          $checksums | Set-Content release/SHA256SUMS.txt -Encoding ascii
           Get-ChildItem release | Format-Table Name, Length
 
-      - name: Create GitHub release
+      - name: Publish one clean GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Intonaco Wallpaper ${{ steps.version.outputs.tag }}
+          tag_name: Intonaco-Wallpaper
+          name: Intonaco Wallpaper
           generate_release_notes: false
           target_commitish: ${{ github.sha }}
           body: |
-            ## Intonaco Wallpaper v${{ steps.version.outputs.version }}
+            Intonaco Wallpaper for Windows 10 and 11.
 
-            A stability-focused update for smoother playback and a reliable in-app preview.
+            Three downloads:
+            - **Intonaco-Wallpaper-Setup.exe** — Windows installation wizard.
+            - **Intonaco-Wallpaper-Portable.exe** — self-contained portable executable.
+            - **Intonaco-Wallpaper.msixupload** — Microsoft Store Partner Center package.
 
-            ### What's improved
-            - Still-image thumbnail preview by default: no continuously running second video decoder while wallpaper playback is active.
-            - **Play live preview** is an optional control, with a still-image fallback when Windows can't decode or display the preview.
-            - `.mlw` files can be selected and imported when they contain standard video, ZIP-wrapped video, or a verifiable embedded MP4 stream.
-            - MLW imports preserve their original file and run preparation away from the UI thread.
-            - Unsupported/protected proprietary MLW variants are clearly identified rather than falsely reported as playable.
-            - Original Intonaco logo, clean Windows installer, and **Acev Dev Co** metadata retained.
+            Fixes include deferred startup playback, smoother window rendering,
+            desktop-shortcut restoration, and reduced preview decoder overhead.
 
-            **Compatibility:** Not every MyLiveWallpapers `.mlw` file can be decoded. Some proprietary variants require the creator's player. Download an MP4 version when available.
+            The Store package uses the registered Acev Apps Co. identity.
+            Submission and certification are handled in Microsoft Partner Center.
+            Some proprietary MLW variants may still require their original player.
 
-            ### Download
-            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64-setup.exe` — Windows installer.
-            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64.exe` — portable standalone EXE.
-            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64-self-contained.zip` — portable archive.
-            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64-framework-dependent.zip` — requires .NET 8 Desktop Runtime.
-
-            The installer and portable EXE do not require a separate .NET installation.
-            Check `SHA256SUMS.txt` to verify downloads.
-
-            **Hardware testing:** Windows CI covers compilation, tests and installer smoke
-            checks. The new MPV backend still requires real Windows hardware validation.
-            It is optional and not bundled. Media codec support and memory/GPU savings
-            are hardware-dependent. Windows may display "Unknown publisher" until
-            the EXE or installer receives a trusted Authenticode signature.
-            The separate Store MSIX upload requires the exact Partner Center
-            package identity and publisher; no Store publication is performed here.
-
-            [Changelog](https://github.com/${{ github.repository }}/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md)
-            · [Verification](https://github.com/${{ github.repository }}/blob/${{ steps.version.outputs.tag }}/docs/VERIFICATION.md)
+            Both Windows binaries are unsigned, so SmartScreen may warn until
+            the developer provides trusted Authenticode signatures.
           files: |
-            release/*.zip
             release/*.exe
+            release/*.msixupload
             release/SHA256SUMS.txt
           fail_on_unmatched_files: true
