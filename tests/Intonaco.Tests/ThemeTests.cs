@@ -122,12 +122,10 @@ namespace Intonaco.Tests
             }
         }
 
-        [Theory]
-        [InlineData("intonaco.ico")]
-        [InlineData("intonaco-mark-light.png")]
-        [InlineData("intonaco-mark-dark.png")]
-        public void BrandAssets_AreEmbedded(string fileName)
+        [Fact]
+        public void BrandIcon_IsEmbedded()
         {
+            const string fileName = "intonaco.ico";
             var assembly = typeof(MainWindow).Assembly;
             using var stream = assembly.GetManifestResourceStream("Intonaco.g.resources");
             Assert.NotNull(stream);

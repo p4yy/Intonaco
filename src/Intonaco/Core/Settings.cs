@@ -22,6 +22,7 @@ namespace Intonaco.Core
         public bool IsMuted { get; set; } = true;
         public double Volume { get; set; } = 0.0;
         public int TargetFps { get; set; } = 30;
+        public string PlaybackBackend { get; set; } = "Windows"; // "Windows" or "MPV"
         public string WallpaperFit { get; set; } = "Fill"; // "Fill", "Fit", "Stretch"
         public double PlaybackSpeed { get; set; } = 1.0;
         public bool LoopPlayback { get; set; } = true;
@@ -79,12 +80,18 @@ namespace Intonaco.Core
                 ? ContinueWhenUnfocusedMode
                 : PauseWhenUnfocusedMode;
 
+        internal static string NormalizeBackend(string? backend) =>
+            string.Equals(backend, "MPV", StringComparison.OrdinalIgnoreCase)
+                ? "MPV" : "Windows";
+
         internal static string NormalizeFit(string? fit)
         {
             if (string.Equals(fit, "Fit", StringComparison.OrdinalIgnoreCase))
                 return "Fit";
+            // Legacy Stretch can warp a video on monitors with a different
+            // aspect ratio. Migrate it to aspect-preserving Cover/Fill.
             if (string.Equals(fit, "Stretch", StringComparison.OrdinalIgnoreCase))
-                return "Stretch";
+                return "Fill";
             return "Fill";
         }
 
@@ -98,6 +105,7 @@ namespace Intonaco.Core
                 ? 1.0
                 : Math.Clamp(PlaybackSpeed, 0.25, 2.0);
             WallpaperFit = NormalizeFit(WallpaperFit);
+            PlaybackBackend = NormalizeBackend(PlaybackBackend);
             BackgroundAnimationMode = NormalizeBackgroundAnimationMode(BackgroundAnimationMode);
 
             // The new mode is the single source of truth. Keep the two legacy

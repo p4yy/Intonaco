@@ -101,22 +101,92 @@ namespace Intonaco.Tests
         public void RecognisedContainers_AreSupported(string fileName)
         {
             Assert.True(MediaFormatProbe.IsSupportedExtension(fileName));
-            Assert.False(MediaFormatProbe.IsKnownUnsupportedExtension(fileName));
+            Assert.False(MediaFormatProbe.IsUncommonContainer(fileName));
         }
 
         [Theory]
         [InlineData("clip.flv")]
         [InlineData("clip.rmvb")]
-        [InlineData("clip.vob")]
         [InlineData("clip.ogv")]
-        public void ContainersWithoutADemuxer_AreRejectedUpFront(string fileName)
+        [InlineData("clip.divx")]
+        [InlineData("clip.mxf")]
+        public void UncommonContainers_AreOfferedAsNativeAttempts(string fileName)
+        {
+            Assert.True(MediaFormatProbe.IsSupportedExtension(fileName));
+            Assert.True(MediaFormatProbe.IsUncommonContainer(fileName));
+            Assert.Contains("*" + Path.GetExtension(fileName),
+                MediaFormatProbe.FileDialogFilter, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Theory]
+        [InlineData("movie.mkv")]
+        [InlineData("loop.webm")]
+        [InlineData("movie.mp4")]
+        [InlineData("clip.avi")]
+        [InlineData("clip.mts")]
+        public void CommonContainers_UseTheNativePipeline(string fileName)
+        {
+            Assert.True(MediaFormatProbe.IsSupportedExtension(fileName));
+            Assert.False(MediaFormatProbe.IsUncommonContainer(fileName));
+        }
+
+        [Theory]
+        [InlineData("clip.gif")]
+        [InlineData("clip.webp")]
+        [InlineData("clip.apng")]
+        [InlineData("clip.exe")]
+        public void NonVideoFormats_AreNotMisrepresentedAsVideo(string fileName)
         {
             Assert.False(MediaFormatProbe.IsSupportedExtension(fileName));
-            Assert.True(MediaFormatProbe.IsKnownUnsupportedExtension(fileName));
-            Assert.False(MediaFormatProbe.TryValidate(
-                Path.Combine(Path.GetTempPath(), fileName), out string error));
-            Assert.Contains("Unsupported codec or format", error, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("MP4 (H.264)", error, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void ContainerSniffer_IdentifiesIsoBmffAndMatroska()
+        {
+            byte[] mp4 = new byte[] { 0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0, 0, 0, 0 };
+            byte[] mkv = new byte[] { 0x1A, 0x45, 0xDF, 0xA3, 0x93, 0x42 };
+
+            Assert.Equal(NativeMediaEngine.Container.IsoBmff,
+                NativeMediaEngine.IdentifyContainer(mp4));
+            Assert.Equal(NativeMediaEngine.Container.Matroska,
+                NativeMediaEngine.IdentifyContainer(mkv));
+        }
+
+        [Fact]
+        public void ContainerSniffer_IdentifiesAviAndTransportStream()
+        {
+            byte[] avi = new byte[] {
+                (byte)'R', (byte)'I', (byte)'F', (byte)'F',
+                0, 0, 0, 0, (byte)'A', (byte)'V', (byte)'I', (byte)' '
+            };
+            byte[] transport = new byte[376];
+            transport[0] = 0x47;
+            transport[188] = 0x47;
+
+            Assert.Equal(NativeMediaEngine.Container.Avi,
+                NativeMediaEngine.IdentifyContainer(avi));
+            Assert.Equal(NativeMediaEngine.Container.MpegTransport,
+                NativeMediaEngine.IdentifyContainer(transport));
+        }
+
+        [Fact]
+        public void ContainerSniffer_DoesNotClaimUnknownBytesAreVideo()
+        {
+            byte[] unknown = new byte[] { 0x44, 0x42, 0x31, 0x6E };
+            Assert.Equal(NativeMediaEngine.Container.Unknown,
+                NativeMediaEngine.IdentifyContainer(unknown));
+        }
+
+        [Theory]
+        [InlineData("Unable to play video: Unsupported codec or format", true)]
+        [InlineData("Could not decode video", true)]
+        [InlineData("0xC00D5212", true)]
+        [InlineData("File not found", false)]
+        [InlineData("Access denied", false)]
+        public void DecoderFailure_IsSeparatedFromFileAccessErrors(
+            string message, bool expected)
+        {
+            Assert.Equal(expected, NativeMediaEngine.IsLikelyDecoderFailure(message));
         }
 
         [Fact]

@@ -7,6 +7,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -21,7 +22,7 @@ namespace Intonaco.Views
     public partial class MainWindow : Window
     {
         private readonly AppSettings _settings;
-        private readonly WallpaperPlayer _player;
+        private IWallpaperPlayer _player;
         private readonly DesktopIntegration _desktop;
         private readonly FullscreenDetector _fullscreenDetector;
         private readonly ForegroundDetector _foregroundDetector;
@@ -31,6 +32,15 @@ namespace Intonaco.Views
             new ObservableCollection<RecentWallpaperItem>();
         private string _fileInfoBase = string.Empty;
         private string? _previewFilePath;
+        private string? _activeOriginalFile;
+        private int _sourceWidth;
+        private int _sourceHeight;
+        private int _wallpaperRequestVersion;
+        private CancellationTokenSource? _preparationCancellation;
+        private string? _rollbackOriginalPath;
+        private bool _rollbackWasPaused;
+        private TimeSpan _rollbackPosition;
+        private bool _lastVideoOpened;
         private bool _previewNeedsPositionSync;
 
         /// <summary>
@@ -38,9 +48,7 @@ namespace Intonaco.Views
         /// <see cref="MediaFormatProbe"/> so the dialog, drag-and-drop and the
         /// player can never disagree about what is supported.
         /// </summary>
-        private const string VideoDialogFilter =
-            "Video files|*.mp4;*.m4v;*.mov;*.mkv;*.webm;*.avi;*.wmv;*.asf;*.mpg;*.mpeg;*.m2ts;*.ts;*.3gp|" +
-            "All files|*.*";
+        private static string VideoDialogFilter => MediaFormatProbe.FileDialogFilter;
 
         private sealed class RecentWallpaperItem
         {
@@ -77,11 +85,22 @@ namespace Intonaco.Views
         // wallpaper is a static suspended frame.
         private DispatcherTimer? _placementTimer;
         private DispatcherTimer? _settingsSaveTimer;
+        private DispatcherTimer? _seekUpdateTimer;
+        private DispatcherTimer? _seekCommitTimer;
+        private TimeSpan _pendingSeekPosition;
+        private bool _updatingSeekSlider;
 
         public MainWindow()
         {
             _settings = AppSettings.Load();
-            _player = new WallpaperPlayer();
+            if (_settings.PlaybackBackend == "MPV" &&
+                !MpvWallpaperPlayer.TryLocateExecutable(out _))
+            {
+                DebugLog.Write("Saved MPV backend not installed; using Windows player.");
+                _settings.PlaybackBackend = "Windows";
+                _settings.Save();
+            }
+            _player = CreatePlayer(_settings.PlaybackBackend);
             _desktop = new DesktopIntegration();
             _fullscreenDetector = new FullscreenDetector();
             _foregroundDetector = new ForegroundDetector();
@@ -98,6 +117,7 @@ namespace Intonaco.Views
             LoadSettings();
             WireEvents();
             InitializeSystemTray();
+            UpdateBackendInterface();
 
             // Handle silent boot: --minimized / -m / StartMinimized setting.
             // StartupUri calls Show() after this constructor returns, so hiding
@@ -135,9 +155,50 @@ namespace Intonaco.Views
             }
         }
 
+        private static IWallpaperPlayer CreatePlayer(string backend) =>
+            AppSettings.NormalizeBackend(backend) == "MPV"
+                ? new MpvWallpaperPlayer() : new WallpaperPlayer();
+
+        private void ApplyPlayerSettings()
+        {
+            _player.TargetFps = _settings.TargetFps;
+            _player.StretchMode = ParseFitMode(_settings.WallpaperFit);
+            _player.PlaybackSpeed = _settings.PlaybackSpeed;
+            _player.LoopPlayback = _settings.LoopPlayback;
+            _player.Volume = _settings.Volume;
+            _player.SetMute(_settings.IsMuted);
+        }
+
+        private void WirePlayerEvents()
+        {
+            _player.StateChanged += OnPlayerStateChanged;
+            _player.ErrorOccurred += OnPlayerError;
+            _player.MediaOpened += OnMediaOpened;
+        }
+
+        private void UnwirePlayerEvents()
+        {
+            _player.StateChanged -= OnPlayerStateChanged;
+            _player.ErrorOccurred -= OnPlayerError;
+            _player.MediaOpened -= OnMediaOpened;
+        }
+
+        private void UpdateBackendInterface()
+        {
+            bool mpv = _player is MpvWallpaperPlayer;
+            FpsComboBox.IsEnabled = !mpv;
+            FpsComboBox.ToolTip = mpv
+                ? "MPV uses the source's native frame cadence; the Windows FPS cap does not apply."
+                : "Preferred presentation frame rate.";
+            PreviewHintText.Text = mpv
+                ? "MPV shows the wallpaper on the desktop without a second decoder."
+                : "Drop a video here or choose a file";
+        }
+
         private void LoadSettings()
         {
             _suppressEvents = true;
+            SelectComboByTag(BackendComboBox, _settings.PlaybackBackend);
 
             // Dedicated focus-animation mode. Mode A pauses animation
             // updates on focus loss; Mode B keeps them running. The choice is
@@ -200,9 +261,7 @@ namespace Intonaco.Views
 
         private void WireEvents()
         {
-            _player.StateChanged += OnPlayerStateChanged;
-            _player.ErrorOccurred += OnPlayerError;
-            _player.MediaOpened += OnMediaOpened;
+            WirePlayerEvents();
 
             // Focus-driven auto-pause (Mode A). Both detectors are gated by
             // the selected background animation mode; Mode B stops them so
@@ -221,6 +280,8 @@ namespace Intonaco.Views
             Closing += OnWindowClosing;
             StateChanged += OnWindowStateChanged;
             IsVisibleChanged += OnMainWindowVisibleChanged;
+            Activated += OnMainWindowActivityChanged;
+            Deactivated += OnMainWindowActivityChanged;
         }
 
         private void OnWindowLoaded(object sender, RoutedEventArgs e)
@@ -279,14 +340,7 @@ namespace Intonaco.Views
                     double luminance = 0.2126 * color.R + 0.7152 * color.G + 0.0722 * color.B;
                     useDark = luminance < 128;
                 }
-
-                // The supplied primary and transparent masters differ in the
-                // small lower detail; use each on its intended surface.
-                string logoFile = useDark
-                    ? "intonaco-mark-dark.png"
-                    : "intonaco-mark-light.png";
-                BrandLogoImage.Source = new System.Windows.Media.Imaging.BitmapImage(
-                    new Uri($"pack://application:,,,/Assets/{logoFile}", UriKind.Absolute));
+                // The header logo is a device-independent WPF vector.
 
                 IntPtr hwnd = new WindowInteropHelper(this).Handle;
                 if (hwnd == IntPtr.Zero)
@@ -370,7 +424,7 @@ namespace Intonaco.Views
             }
             else
             {
-                ShowError("Drop a supported video file: MP4, WebM, MKV, MOV, AVI or WMV.");
+                ShowError("Drop a video or animated file: MP4, MKV, WebM, FLV, MOV, GIF and more.");
             }
             e.Handled = true;
         }
@@ -446,7 +500,7 @@ namespace Intonaco.Views
         {
             string meta = $"{System.IO.Path.GetExtension(path).TrimStart('.').ToUpperInvariant()} • {FormatFileSize(path)}";
 
-            if (string.Equals(path, _player.CurrentFilePath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(path, _activeOriginalFile, StringComparison.OrdinalIgnoreCase))
             {
                 if (_player.NaturalVideoWidth > 0 && _player.NaturalVideoHeight > 0)
                     meta += $" • {_player.NaturalVideoWidth}×{_player.NaturalVideoHeight}";
@@ -459,7 +513,7 @@ namespace Intonaco.Views
 
         private void OnOpenFileLocation(object sender, RoutedEventArgs e)
         {
-            string? path = _player.CurrentFilePath ?? _settings.LastWallpaperPath;
+            string? path = _activeOriginalFile ?? _settings.LastWallpaperPath;
             try
             {
                 if (!string.IsNullOrEmpty(path) && File.Exists(path))
@@ -528,7 +582,7 @@ namespace Intonaco.Views
             }
         }
 
-        private void ApplyWallpaper(
+        private async void ApplyWallpaper(
             string filePath,
             bool startPaused = false,
             TimeSpan pausedPosition = default)
@@ -544,8 +598,64 @@ namespace Intonaco.Views
                 return;
             }
 
-            // Stop existing playback
+            // Retain a known-good wallpaper until the replacement has opened.
+            _rollbackOriginalPath = null;
+            if (_lastVideoOpened && _isApplied &&
+                _activeOriginalFile != null &&
+                !string.Equals(_activeOriginalFile, filePath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _rollbackOriginalPath = _activeOriginalFile;
+                _rollbackWasPaused =
+                    _player.CurrentState == WallpaperPlayer.PlaybackState.Paused;
+                _rollbackPosition = _player.Position;
+            }
+
+            // Our native engine performs container inspection and lossless
+            // aspect-metadata repair. It does not execute or download codecs.
+            _preparationCancellation?.Cancel();
+            var operation = new CancellationTokenSource();
+            _preparationCancellation = operation;
+            int requestVersion = ++_wallpaperRequestVersion;
+            PreparedWallpaper prepared;
+            try
+            {
+                prepared = await NativeMediaEngine.PrepareAsync(
+                    filePath, operation.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                if (requestVersion == _wallpaperRequestVersion && !_isExiting)
+                    ResetStatusAfterPreparation();
+                return;
+            }
+            catch (Exception ex)
+            {
+                if (requestVersion == _wallpaperRequestVersion && !_isExiting)
+                {
+                    ResetStatusAfterPreparation();
+                    NotifyPlaybackError("Could not prepare this video: " + ex.Message);
+                }
+                return;
+            }
+            finally
+            {
+                if (ReferenceEquals(_preparationCancellation, operation))
+                    _preparationCancellation = null;
+                operation.Dispose();
+            }
+
+            if (_isExiting || requestVersion != _wallpaperRequestVersion)
+                return;
+
+            // Do not keep showing an old decoder when applying a new file.
             StopWallpaper();
+            _sourceWidth = prepared.SourceWidth;
+            _sourceHeight = prepared.SourceHeight;
+            _activeOriginalFile = filePath;
+            if (prepared.CorrectedAspect)
+                DebugLog.Write("MP4 nonstandard pixel aspect normalized in cache; original untouched: " + filePath);
+
 
             // Create player window if needed
             if (_playerWindow == null)
@@ -569,7 +679,7 @@ namespace Intonaco.Views
             }
 
             // Start playback
-            if (!_player.Play(filePath))
+            if (!_player.Play(prepared.PlaybackPath))
             {
                 return; // Error event will fire
             }
@@ -603,13 +713,27 @@ namespace Intonaco.Views
 
             // Update UI
             UpdateFileInfo(filePath);
-            UpdatePreview(filePath);
+            UpdatePreview(prepared.PlaybackPath);
             RefreshRecentWallpapers();
+        }
+
+        private void ResetStatusAfterPreparation()
+        {
+            StatusText.Text = _player.CurrentState switch
+            {
+                WallpaperPlayer.PlaybackState.Playing => "Playing",
+                WallpaperPlayer.PlaybackState.Paused => "Paused",
+                _ => "Stopped"
+            };
         }
 
         private void StopWallpaper()
         {
             _player.Stop();
+            _lastVideoOpened = false;
+            _activeOriginalFile = null;
+            _sourceWidth = 0;
+            _sourceHeight = 0;
             _desktop.Detach();
             _isApplied = false;
             _pausedByUser = false;
@@ -679,8 +803,32 @@ namespace Intonaco.Views
                 : duration.ToString(@"m\:ss");
         }
 
+        // A separate video decoder is useful only while the user is actually
+        // interacting with Intonaco. Release it when switching applications.
         private bool IsPreviewWindowVisible =>
-            IsVisible && WindowState != WindowState.Minimized;
+            IsVisible && WindowState != WindowState.Minimized && IsActive;
+
+        private void OnMainWindowActivityChanged(object? sender, EventArgs e)
+        {
+            if (_isExiting || !IsLoaded)
+                return;
+
+            RefreshPreviewForCurrentState();
+            UpdateSeekTimer();
+        }
+
+        // Keep the media preview in a balanced 16:9 frame instead of a thin
+        // panoramic strip when the app is maximized. This changes only the
+        // settings window, never the desktop wallpaper's original aspect.
+        private void OnPreviewPanelSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (!e.WidthChanged || e.NewSize.Width <= 0)
+                return;
+
+            double desiredHeight = Math.Clamp(e.NewSize.Width * 9.0 / 16.0, 230, 596.25);
+            if (Math.Abs(PreviewPanel.Height - desiredHeight) > 0.5)
+                PreviewPanel.Height = desiredHeight;
+        }
 
         private void UpdatePreview(string filePath)
         {
@@ -707,6 +855,18 @@ namespace Intonaco.Views
         /// </summary>
         private void RefreshPreviewForCurrentState()
         {
+            // MPV's desktop surface is the only MPV decoder. Avoid starting
+            // a separate MediaElement that may not understand MPV-only codecs.
+            if (_player is MpvWallpaperPlayer)
+            {
+                ReleasePreviewPipeline();
+                PreviewImage.Source = null;
+                PreviewImage.Visibility = Visibility.Collapsed;
+                PreviewPlaceholder.Visibility = Visibility.Visible;
+                PreviewHintText.Text =
+                    "MPV renders on your desktop without a second preview decoder.";
+                return;
+            }
             if (_previewFilePath == null)
             {
                 ReleasePreviewPipeline();
@@ -929,8 +1089,110 @@ namespace Intonaco.Views
             object sender,
             DependencyPropertyChangedEventArgs e)
         {
-            if (!_isExiting)
-                RefreshPreviewForCurrentState();
+            if (_isExiting)
+                return;
+            RefreshPreviewForCurrentState();
+            UpdateSeekTimer();
+        }
+
+        /// <summary>
+        /// Sample the native playhead only while the control window is visible.
+        /// There is no per-frame listener or extra decoder just for the slider.
+        /// </summary>
+        private void UpdateSeekTimer()
+        {
+            bool active = !_isExiting && IsPreviewWindowVisible &&
+                _player.CurrentState == WallpaperPlayer.PlaybackState.Playing;
+            if (!active)
+            {
+                _seekUpdateTimer?.Stop();
+                RefreshSeekProgress();
+                return;
+            }
+
+            if (_seekUpdateTimer == null)
+            {
+                _seekUpdateTimer = new DispatcherTimer(DispatcherPriority.Background)
+                {
+                    Interval = TimeSpan.FromSeconds(1)
+                };
+                _seekUpdateTimer.Tick += (_, _) => RefreshSeekProgress();
+            }
+
+            RefreshSeekProgress();
+            if (!_seekUpdateTimer.IsEnabled)
+                _seekUpdateTimer.Start();
+        }
+
+        private void RefreshSeekProgress()
+        {
+            if (!IsLoaded || SeekSlider == null)
+                return;
+
+            TimeSpan duration = _player.Duration;
+            TimeSpan position = _player.Position;
+            bool canSeek = duration > TimeSpan.Zero &&
+                _player.CurrentState != WallpaperPlayer.PlaybackState.Stopped &&
+                _player.CurrentState != WallpaperPlayer.PlaybackState.Error;
+
+            _updatingSeekSlider = true;
+            try
+            {
+                SeekSlider.IsEnabled = canSeek;
+                if (!SeekSlider.IsMouseCaptureWithin && _seekCommitTimer?.IsEnabled != true)
+                    SeekSlider.Value = canSeek
+                        ? Math.Clamp(100.0 * position.TotalSeconds /
+                            duration.TotalSeconds, 0.0, 100.0)
+                        : 0;
+                SeekElapsedText.Text = FormatDuration(canSeek ? position : TimeSpan.Zero);
+                SeekDurationText.Text = FormatDuration(canSeek ? duration : TimeSpan.Zero);
+            }
+            finally
+            {
+                _updatingSeekSlider = false;
+            }
+        }
+
+        private void OnSeekChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents || _updatingSeekSlider ||
+                _player.Duration <= TimeSpan.Zero)
+                return;
+
+            // Debounce media seeks so moving the thumb does not ask the 4K
+            // hardware decoder to jump on every pointer event.
+            _pendingSeekPosition = TimeSpan.FromSeconds(
+                _player.Duration.TotalSeconds * Math.Clamp(e.NewValue, 0, 100) / 100);
+            SeekElapsedText.Text = FormatDuration(_pendingSeekPosition);
+
+            if (_seekCommitTimer == null)
+            {
+                _seekCommitTimer = new DispatcherTimer(DispatcherPriority.Background)
+                {
+                    Interval = TimeSpan.FromMilliseconds(240)
+                };
+                _seekCommitTimer.Tick += (_, _) =>
+                {
+                    _seekCommitTimer.Stop();
+                    if (_player.CurrentState == WallpaperPlayer.PlaybackState.Stopped)
+                        return;
+
+                    _player.Seek(_pendingSeekPosition);
+                    try
+                    {
+                        if (PreviewMedia.Source != null)
+                            PreviewMedia.Position = _pendingSeekPosition;
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog.Write("Preview seek failed: " + ex.Message);
+                    }
+                    RefreshSeekProgress();
+                };
+            }
+
+            _seekCommitTimer.Stop();
+            _seekCommitTimer.Start();
         }
 
         private void UpdateBackgroundTimers()
@@ -964,7 +1226,7 @@ namespace Intonaco.Views
 
             _placementTimer.Interval =
                 _player.CurrentState == WallpaperPlayer.PlaybackState.Playing
-                    ? TimeSpan.FromSeconds(5)
+                    ? TimeSpan.FromSeconds(10)
                     : TimeSpan.FromSeconds(15);
 
             if (!_placementTimer.IsEnabled)
@@ -1030,6 +1292,10 @@ namespace Intonaco.Views
 
         private void OnStop(object sender, RoutedEventArgs e)
         {
+            ++_wallpaperRequestVersion; // Cancel an in-flight async apply.
+            _preparationCancellation?.Cancel();
+            _rollbackOriginalPath = null;
+            _seekCommitTimer?.Stop();
             StopWallpaper();
         }
 
@@ -1140,6 +1406,53 @@ namespace Intonaco.Views
 
             _settings.StartWithWindows = StartWithWindowsToggle.IsChecked == true;
             _settings.Save();
+        }
+
+        private void OnBackendChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents ||
+                BackendComboBox.SelectedItem is not ComboBoxItem item ||
+                item.Tag is not string candidate)
+                return;
+
+            string requested = AppSettings.NormalizeBackend(candidate);
+            if (requested == _settings.PlaybackBackend)
+                return;
+
+            if (requested == "MPV" &&
+                !MpvWallpaperPlayer.TryLocateExecutable(out _))
+            {
+                _suppressEvents = true;
+                try { SelectComboByTag(BackendComboBox, _settings.PlaybackBackend); }
+                finally { _suppressEvents = false; }
+                ShowError("MPV is optional and not bundled. Install mpv from mpv.io, " +
+                    "put mpv.exe beside Intonaco.exe or add it to PATH, then choose MPV again.");
+                return;
+            }
+
+            string? activeFile = _activeOriginalFile;
+            bool wasPaused = _player.CurrentState == WallpaperPlayer.PlaybackState.Paused;
+            TimeSpan position = _player.Position;
+
+            // Release one backend fully before activating the next. Never
+            // retain two desktop decoders or orphaned MPV processes.
+            ++_wallpaperRequestVersion;
+            _preparationCancellation?.Cancel();
+            StopWallpaper();
+            UnwirePlayerEvents();
+            _player.Dispose();
+            _player = CreatePlayer(requested);
+            WirePlayerEvents();
+
+            _settings.PlaybackBackend = requested;
+            ApplyPlayerSettings();
+            UpdateBackendInterface();
+            _settings.Save();
+            RefreshPreviewForCurrentState();
+            UpdateSeekTimer();
+
+            if (!string.IsNullOrEmpty(activeFile) && File.Exists(activeFile))
+                ApplyWallpaper(activeFile, startPaused: wasPaused, pausedPosition: position);
         }
 
         private void OnFpsChanged(object sender, SelectionChangedEventArgs e)
@@ -1273,7 +1586,7 @@ namespace Intonaco.Views
             return AppSettings.NormalizeFit(fit) switch
             {
                 "Fit" => Stretch.Uniform,
-                "Stretch" => Stretch.Fill,
+                "Stretch" => Stretch.UniformToFill, // Legacy only: never distort.
                 _ => Stretch.UniformToFill
             };
         }
@@ -1290,15 +1603,9 @@ namespace Intonaco.Views
             {
                 RefreshPreviewForCurrentState();
                 UpdateBackgroundTimers();
-
-                if (state == WallpaperPlayer.PlaybackState.Paused)
-                {
-                    PerformanceMonitor.SchedulePausedCollection(
-                        Dispatcher,
-                        () => !_isExiting &&
-                              _player.CurrentState == WallpaperPlayer.PlaybackState.Paused &&
-                              !IsPreviewWindowVisible);
-                }
+                UpdateSeekTimer();
+                // Pausing keeps the native media surface alive. A full GC
+                // cannot release that decoder and would stall the UI thread.
             }
 
             Dispatcher.BeginInvoke(() =>
@@ -1400,9 +1707,47 @@ namespace Intonaco.Views
         private void OnPlayerError(string message)
         {
             if (Dispatcher.CheckAccess())
-                NotifyPlaybackError(message);
+                HandlePlayerError(message);
             else
-                Dispatcher.BeginInvoke(() => NotifyPlaybackError(message));
+                Dispatcher.BeginInvoke(() => HandlePlayerError(message));
+        }
+
+        private void HandlePlayerError(string message)
+        {
+            if (_isExiting) return;
+
+            string detail;
+            if (_player is MpvWallpaperPlayer)
+            {
+                detail = "MPV could not play this video. Verify your optional MPV " +
+                    "installation and its supported codecs. Details: " + message;
+            }
+            else
+            {
+                detail = NativeMediaEngine.IsLikelyDecoderFailure(message)
+                    ? NativeMediaEngine.CodecHelp +
+                        " You can also select the optional MPV backend in Playback settings. " +
+                        "Details: " + message
+                    : message;
+            }
+
+            NotifyPlaybackError(detail);
+            // If this video cannot be decoded, restore the previous source
+            // rather than leaving an empty or broken desktop.
+            RestoreLastWorkingWallpaper();
+        }
+
+        private void RestoreLastWorkingWallpaper()
+        {
+            string? previous = _rollbackOriginalPath;
+            bool paused = _rollbackWasPaused;
+            TimeSpan position = _rollbackPosition;
+            _rollbackOriginalPath = null;
+            if (string.IsNullOrEmpty(previous) || !File.Exists(previous))
+                return;
+
+            DebugLog.Write("Restoring the previous working wallpaper.");
+            ApplyWallpaper(previous, startPaused: paused, pausedPosition: position);
         }
 
         /// <summary>
@@ -1443,14 +1788,44 @@ namespace Intonaco.Views
         {
             Dispatcher.BeginInvoke(() =>
             {
+                if (!_isApplied) return;
+
+                // MediaElement can misinterpret broken MP4 pixel-aspect data:
+                // e.g. report 232x2160 for a genuine 3840x2160 video. Never
+                // stretch such a broken decoder surface across the desktop.
+                if (_sourceWidth > 0 && _sourceHeight > 0 &&
+                    _player.NaturalVideoWidth > 0 && _player.NaturalVideoHeight > 0 &&
+                    // Reject wildly incorrect decoder dimensions without blocking
+                    // legitimate non-square-pixel/anamorphic video (such as
+                    // 1440x1080 video displayed at 1920x1080).
+                    (_player.NaturalVideoWidth < _sourceWidth / 2 ||
+                     _player.NaturalVideoWidth > _sourceWidth * 2 ||
+                     _player.NaturalVideoHeight < _sourceHeight / 2 ||
+                     _player.NaturalVideoHeight > _sourceHeight * 2))
+                {
+                    string message =
+                        "Windows reported incorrect video dimensions (" +
+                        _player.NaturalVideoWidth + "×" + _player.NaturalVideoHeight +
+                        " instead of " + _sourceWidth + "×" + _sourceHeight +
+                        "). Playback was stopped to avoid a distorted wallpaper. " +
+                        "Try a standard H.264 MP4 with square pixels.";
+                    DebugLog.Write("Decoder geometry rejected: " + message);
+                    StopWallpaper();
+                    NotifyPlaybackError(message);
+                    return;
+                }
+
                 string info = _fileInfoBase;
                 if (_player.NaturalVideoWidth > 0 && _player.NaturalVideoHeight > 0)
                     info += $" • {_player.NaturalVideoWidth}×{_player.NaturalVideoHeight}";
                 if (duration > TimeSpan.Zero)
                     info += $" • {FormatDuration(duration)}";
 
+                _lastVideoOpened = true;
+                _rollbackOriginalPath = null;
                 FileInfoText.Text = info;
                 RefreshRecentWallpapers();
+                RefreshSeekProgress();
             });
         }
 
@@ -1583,7 +1958,7 @@ namespace Intonaco.Views
             if (_desktop.Reattach())
                 return;
 
-            string? path = _player.CurrentFilePath ?? _settings.LastWallpaperPath;
+            string? path = _activeOriginalFile ?? _settings.LastWallpaperPath;
             var state = _player.CurrentState;
             TimeSpan position = _player.Position;
             if (!string.IsNullOrEmpty(path) && File.Exists(path))
@@ -1610,6 +1985,11 @@ namespace Intonaco.Views
         }
 
         #endregion
+
+        private void OnAboutClick(object sender, RoutedEventArgs e)
+        {
+            new AboutWindow { Owner = this }.ShowDialog();
+        }
 
         #region Window Management
 
@@ -1653,8 +2033,12 @@ namespace Intonaco.Views
             }
 
             // Actual shutdown
+            _preparationCancellation?.Cancel();
+            ++_wallpaperRequestVersion;
             _placementTimer?.Stop();
             _settingsSaveTimer?.Stop();
+            _seekUpdateTimer?.Stop();
+            _seekCommitTimer?.Stop();
             _fullscreenDetector.Dispose();
             _foregroundDetector.Dispose();
             _systemEvents.Dispose();
@@ -1664,6 +2048,9 @@ namespace Intonaco.Views
             TrayIcon.Dispose();
         }
 
+        /// <summary>Called when a second shortcut launch asks this instance to reopen.</summary>
+        public void RestoreFromSecondaryLaunch() => ShowMainWindow();
+
         private void ShowMainWindow()
         {
             Show();
@@ -1672,6 +2059,7 @@ namespace Intonaco.Views
             Activate();
             Focus();
             RefreshPreviewForCurrentState();
+            UpdateSeekTimer();
         }
 
         #endregion

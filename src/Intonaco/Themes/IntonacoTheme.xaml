@@ -2,29 +2,27 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
-    <!-- Intonaco v2.0 Windows 11 Fluent Dark — clean, professional, no AI-slop.
-         Palette matches the overhaul plan: #1E1E1E mica, #272727 cards,
-         subtle rgba borders, Windows Blue #60CDFF accent used sparingly. -->
-    <Color x:Key="WindowBackgroundColor">#FF1E1E1E</Color>
-    <Color x:Key="CardBackgroundColor">#FF272727</Color>
-    <Color x:Key="CardBorderColor">#14FFFFFF</Color>
+    <!-- Dark palette: graphite surfaces and a restrained sea-glass accent. -->
+    <Color x:Key="WindowBackgroundColor">#FF141A1D</Color>
+    <Color x:Key="CardBackgroundColor">#FF20282B</Color>
+    <Color x:Key="CardBorderColor">#1EFFFFFF</Color>
     <Color x:Key="TextPrimaryColor">#FFFFFFFF</Color>
-    <Color x:Key="TextSecondaryColor">#FFA0A0A0</Color>
-    <Color x:Key="AccentColor">#FF60CDFF</Color>
-    <Color x:Key="AccentHoverColor">#FF50BCEB</Color>
-    <Color x:Key="AccentPressedColor">#FF3AAEDC</Color>
-    <Color x:Key="AccentForegroundColor">#FF000000</Color>
-    <Color x:Key="ButtonBackgroundColor">#FF2B2B2B</Color>
-    <Color x:Key="ButtonHoverColor">#FF323232</Color>
-    <Color x:Key="ButtonPressedColor">#FF262626</Color>
-    <Color x:Key="ButtonBorderColor">#1AFFFFFF</Color>
+    <Color x:Key="TextSecondaryColor">#FFABBABD</Color>
+    <Color x:Key="AccentColor">#FF83DFCC</Color>
+    <Color x:Key="AccentHoverColor">#FFA4EAD9</Color>
+    <Color x:Key="AccentPressedColor">#FF65C8B5</Color>
+    <Color x:Key="AccentForegroundColor">#FF10201D</Color>
+    <Color x:Key="ButtonBackgroundColor">#FF293236</Color>
+    <Color x:Key="ButtonHoverColor">#FF323C40</Color>
+    <Color x:Key="ButtonPressedColor">#FF222B2F</Color>
+    <Color x:Key="ButtonBorderColor">#24FFFFFF</Color>
     <Color x:Key="DividerColor">#14FFFFFF</Color>
     <Color x:Key="InputBackgroundColor">#FF2B2B2B</Color>
     <Color x:Key="InputHoverColor">#FF323232</Color>
     <Color x:Key="InputBorderColor">#1AFFFFFF</Color>
-    <Color x:Key="SubtleBackgroundColor">#FF2E2E2E</Color>
+    <Color x:Key="SubtleBackgroundColor">#FF2A3437</Color>
     <Color x:Key="PreviewBackgroundColor">#FF000000</Color>
-    <Color x:Key="TrackBackgroundColor">#FF5A5A5A</Color>
+    <Color x:Key="TrackBackgroundColor">#FF647476</Color>
     <Color x:Key="ErrorColor">#FFFF99A4</Color>
     <Color x:Key="SuccessColor">#FF6CCB5F</Color>
 
@@ -49,7 +47,7 @@
     <SolidColorBrush x:Key="SubtleBackgroundBrush" Color="{StaticResource SubtleBackgroundColor}" />
     <SolidColorBrush x:Key="PreviewBackgroundBrush" Color="{StaticResource PreviewBackgroundColor}" />
     <SolidColorBrush x:Key="TrackBackgroundBrush" Color="{StaticResource TrackBackgroundColor}" />
-    <SolidColorBrush x:Key="AccentSoftBrush" Color="#1460CDFF" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#1A83DFCC" />
     <SolidColorBrush x:Key="SuccessSoftBrush" Color="#146CCB5F" />
     <SolidColorBrush x:Key="ErrorSoftBrush" Color="#14FF99A4" />
     <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}" />
@@ -61,14 +59,14 @@
     <FontFamily x:Key="DefaultFont">Segoe UI Variable Text, Segoe UI Variable, Segoe UI, sans-serif</FontFamily>
     <FontFamily x:Key="HeadingFont">Segoe UI Variable Display, Segoe UI Variable, Segoe UI, sans-serif</FontFamily>
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
-    <sys:Double x:Key="FontSizeCaption">12</sys:Double>
-    <sys:Double x:Key="FontSizeBody">14</sys:Double>
-    <sys:Double x:Key="FontSizeSubtitle">16</sys:Double>
-    <sys:Double x:Key="FontSizeTitle">20</sys:Double>
+    <sys:Double x:Key="FontSizeCaption">13</sys:Double>
+    <sys:Double x:Key="FontSizeBody">15</sys:Double>
+    <sys:Double x:Key="FontSizeSubtitle">17</sys:Double>
+    <sys:Double x:Key="FontSizeTitle">22</sys:Double>
 
-    <!-- WinUI radii: 4 px controls, 8 px cards/overlays. -->
-    <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
-    <CornerRadius x:Key="CardCornerRadius">8</CornerRadius>
+    <!-- Shared radii keep controls and surfaces consistent. -->
+    <CornerRadius x:Key="ControlCornerRadius">7</CornerRadius>
+    <CornerRadius x:Key="CardCornerRadius">12</CornerRadius>
     <CornerRadius x:Key="WindowCornerRadius">8</CornerRadius>
 
     <!-- Shared text styles keep the settings page visually consistent. -->

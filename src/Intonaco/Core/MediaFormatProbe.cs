@@ -9,10 +9,9 @@ namespace Intonaco.Core
     ///
     /// Windows Media Foundation reports failures only after it has opened the
     /// file, which is why an unsupported codec used to look like a black
-    /// desktop or a silent hang. This probe rejects the cases that can be
-    /// decided up front — missing file, empty file, unreadable file, and a
-    /// container Media Foundation cannot demux at all — so the user gets an
-    /// immediate, actionable message instead.
+    /// desktop or a silent hang. This probe rejects missing, empty, unreadable
+    /// and unrecognized files up front. Container and codec support depend
+    /// on Media Foundation and the user's installed Windows decoders.
     ///
     /// Codec-level support (for example HEVC without the HEVC Video Extensions)
     /// still has to be discovered by the decoder; <see cref="WallpaperPlayer"/>
@@ -20,48 +19,48 @@ namespace Intonaco.Core
     /// </summary>
     public static class MediaFormatProbe
     {
-        /// <summary>
-        /// Containers the Windows Media Foundation pipeline can demux. Anything
-        /// outside this set is rejected before a decoder is ever created.
-        /// </summary>
-        private static readonly HashSet<string> SupportedExtensions =
+        // This is a list of containers worth trying with the installed
+        // Windows Media Foundation codecs. Recognition is NOT a guarantee
+        // that every stream inside the container can be decoded.
+        private static readonly string[] VideoExtensions =
+        {
+            ".mp4", ".m4v", ".mp4v", ".mov", ".qt",
+            ".mkv", ".webm", ".avi", ".wmv", ".asf",
+            ".mpg", ".mpeg", ".m2ts", ".mts", ".m2t", ".ts",
+            ".3gp", ".3g2", ".3gpp", ".vob",
+            ".flv", ".f4v", ".ogv", ".ogg", ".divx",
+            ".rm", ".rmvb", ".amv", ".nsv", ".mxf",
+            ".mpv", ".m2v", ".dat", ".dv", ".nut", ".y4m"
+        };
+
+        private static readonly HashSet<string> RecognizedExtensions =
+            new HashSet<string>(VideoExtensions, StringComparer.OrdinalIgnoreCase);
+
+        private static readonly HashSet<string> UncommonContainers =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                ".mp4", ".m4v", ".mov", ".qt",
-                ".mkv", ".webm",
-                ".avi", ".wmv", ".asf",
-                ".mpg", ".mpeg", ".m2ts", ".ts",
-                ".3gp", ".3g2"
+                ".flv", ".f4v", ".ogv", ".ogg", ".divx", ".rm", ".rmvb",
+                ".amv", ".nsv", ".mxf", ".dv", ".nut", ".y4m", ".dat"
             };
 
-        /// <summary>
-        /// Containers that are commonly mistaken for playable video but have no
-        /// Media Foundation demuxer. Naming them lets the error message explain
-        /// what to do instead of only saying "unsupported".
-        /// </summary>
-        private static readonly HashSet<string> KnownUnsupportedExtensions =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ".flv", ".rm", ".rmvb", ".vob", ".ogv", ".ogg", ".divx", ".f4v", ".amv", ".nsv"
-            };
+        public static string FileDialogFilter =>
+            "Video files|" +
+            string.Join(";", Array.ConvertAll(VideoExtensions, ext => "*" + ext)) +
+            "|All files|*.*";
 
         public const string UnsupportedFormatMessage =
-            "Unable to play video: Unsupported codec or format. " +
-            "Please use standard MP4 (H.264) or WebM files.";
+            "Unrecognized video file extension. Select a video file.";
 
         public static bool IsSupportedExtension(string? path)
         {
             if (string.IsNullOrWhiteSpace(path)) return false;
             string ext = Path.GetExtension(path);
-            return !string.IsNullOrEmpty(ext) && SupportedExtensions.Contains(ext);
+            return !string.IsNullOrEmpty(ext) && RecognizedExtensions.Contains(ext);
         }
 
-        public static bool IsKnownUnsupportedExtension(string? path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return false;
-            string ext = Path.GetExtension(path);
-            return !string.IsNullOrEmpty(ext) && KnownUnsupportedExtensions.Contains(ext);
-        }
+        public static bool IsUncommonContainer(string? path) =>
+            !string.IsNullOrWhiteSpace(path) &&
+            UncommonContainers.Contains(Path.GetExtension(path));
 
         /// <summary>
         /// Validates a candidate wallpaper file. Returns true when the file is
@@ -78,17 +77,10 @@ namespace Intonaco.Core
                 return false;
             }
 
-            if (IsKnownUnsupportedExtension(path))
-            {
-                error = UnsupportedFormatMessage +
-                        $" ({Path.GetExtension(path).ToUpperInvariant()} files cannot be decoded by Windows.)";
-                return false;
-            }
-
             if (!IsSupportedExtension(path))
             {
                 error = UnsupportedFormatMessage +
-                        $" ({Path.GetFileName(path)} is not a recognised video container.)";
+                        $" ({Path.GetFileName(path)})";
                 return false;
             }
 
@@ -143,7 +135,8 @@ namespace Intonaco.Core
         }
 
         /// <summary>
-        /// Convenience wrapper returning null when the file is playable.
+        /// Convenience wrapper returning null when preflight succeeds.
+        /// Actual decoding may still fail for an unsupported codec.
         /// </summary>
         public static string? Validate(string? path)
             => TryValidate(path, out string error) ? null : error;

@@ -11,6 +11,9 @@ namespace Intonaco
     public partial class App : Application
     {
         private Mutex? _mutex;
+        private EventWaitHandle? _showExistingEvent;
+        private RegisteredWaitHandle? _showExistingWait;
+        private const string ShowExistingEventName = @"Local\Intonaco_ShowMainWindow";
         private bool _ownsMutex;
         private ResourceDictionary? _lightThemeDictionary;
         private string _themePreference = "System";
@@ -22,16 +25,39 @@ namespace Intonaco
             _ownsMutex = createdNew;
             if (!createdNew)
             {
-                // A login-time launch (--minimized) must never put a dialog in
-                // the user's face; it simply yields to the running instance.
+                // Forward shortcut launches to the existing UI, even when
+                // that window is hidden in the tray. Silent startup never
+                // interrupts an existing instance.
                 if (!Core.StartupManager.ShouldStartMinimized(e.Args))
                 {
-                    MessageBox.Show("Intonaco is already running.", "Intonaco",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    try
+                    {
+                        using var signal = EventWaitHandle.OpenExisting(ShowExistingEventName);
+                        signal.Set();
+                    }
+                    catch (WaitHandleCannotBeOpenedException) { }
+                    catch (UnauthorizedAccessException) { }
                 }
                 Shutdown();
                 return;
             }
+
+            // Event-based handoff: no polling timer or additional process.
+            _showExistingEvent = new EventWaitHandle(
+                false, EventResetMode.AutoReset, ShowExistingEventName);
+            _showExistingWait = ThreadPool.RegisterWaitForSingleObject(
+                _showExistingEvent,
+                (_, timedOut) =>
+                {
+                    if (timedOut || Dispatcher.HasShutdownStarted)
+                        return;
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (MainWindow is Views.MainWindow window)
+                            window.RestoreFromSecondaryLaunch();
+                    });
+                },
+                null, Timeout.Infinite, executeOnlyOnce: false);
 
             // Ensure settings directory exists
             var settingsDir = Path.Combine(
@@ -57,6 +83,9 @@ namespace Intonaco
         {
             try { SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged; }
             catch { /* Non-critical. */ }
+
+            _showExistingWait?.Unregister(null);
+            _showExistingEvent?.Dispose();
 
             // Only the instance that created the mutex owns it; releasing a
             // mutex owned by another process throws ApplicationException.

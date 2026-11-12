@@ -4,6 +4,38 @@ All notable changes to Intonaco are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] — 2026-11-12
+
+A native-interface refresh with safer video compatibility and leaner UI activity.
+
+### Added
+- Optional, separately installed MPV video backend, selected in Playback settings.
+  Windows Media Foundation remains the default; no MPV/FFmpeg dependencies
+  are included with the app.
+- Real vector GitHub, PayPal and Ko-fi icons in About, credited to Simple Icons.
+- Native media preparation and conservative metadata-only MP4 aspect-ratio
+  correction using a separate cached copy, without re-encoding or modifying
+  the original video.
+
+### Improved
+- Responsive 16:9 preview and readable typography at larger window sizes,
+  with a centered, width-constrained settings layout.
+- The secondary WPF preview decoder closes as soon as the control window is
+  minimized, hidden, or loses activation; it reopens only when the user
+  returns. The desktop player remains independently active.
+- Less frequent desktop placement polling while playing (10 seconds).
+  Explorer restart notifications still request immediate reattachment.
+- Cancel stale preparation work, retain the last functioning wallpaper on
+  unsupported media, and avoid forced full garbage collection on pause.
+- Reopening Intonaco from another shortcut restores the existing window.
+
+### Verification
+- Windows Actions build, unit tests, published portable binaries, and installer
+  smoke test are required for release. Actual desktop layering, MPV embedding,
+  codec compatibility, pause-frame fidelity, DPI configurations, and energy
+  use require manual tests on physical Windows devices before Store submission.
+- No guaranteed frame-rate cap or universal codec compatibility is claimed.
+
 ## [2.0.2] — 2026-10-27
 
 Critical rendering fix plus a dedicated background-animation setting.
