@@ -13,9 +13,9 @@
     <Company>Intonaco</Company>
     <Copyright>Copyright © 2026 Intonaco Contributors</Copyright>
     <Authors>Intonaco Contributors</Authors>
-    <Version>2.1.0</Version>
-    <AssemblyVersion>2.1.0.0</AssemblyVersion>
-    <FileVersion>2.1.0.0</FileVersion>
+    <Version>2.1.1</Version>
+    <AssemblyVersion>2.1.1.0</AssemblyVersion>
+    <FileVersion>2.1.1.0</FileVersion>
     <!-- RuntimeIdentifier / SelfContained are supplied by publish commands
          (build.ps1, CI) so plain `dotnet build` / `dotnet test` stay RID-agnostic. -->
     <PublishSingleFile>true</PublishSingleFile>
@@ -38,6 +38,13 @@
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <Optimize>true</Optimize>
     <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <!-- Store packaging opts into WinRT startup-task APIs without changing
+       the existing unpackaged GitHub executable or its runtime target. -->
+  <PropertyGroup Condition="'$(StoreBuild)' == 'true'">
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <DefineConstants>$(DefineConstants);INTONACO_STORE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

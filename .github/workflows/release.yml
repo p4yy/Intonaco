@@ -155,14 +155,14 @@ jobs:
           body: |
             ## Intonaco v${{ steps.version.outputs.version }}
 
-            Refined native Windows UI, safer video handling and reduced background UI overhead.
+            Compact native Windows controls with safer launch and restore behavior.
 
             ### Highlights
-            - Balanced 16:9 preview and centered settings on large screens.
-            - Updated vector branding, including GitHub, PayPal and Ko-fi icons.
-            - Metadata-only cached MP4 aspect correction (original video is preserved).
-            - Optional external MPV backend; built-in Windows playback stays the default.
-            - Preview decoder released when the app is hidden, minimized or inactive.
+            - Opens in a compact, tall window by default, clamped to available screen height.
+            - Manual app launches open the controls, even if Windows sign-in is configured to start silently.
+            - Minimized/tray windows restore to Normal before showing, with preview refresh after layout.
+            - Previous native UI, video handling and background efficiency improvements retained.
+            - Standalone Store MSIX preview packaging is kept separate from the GitHub installer.
 
             ### Download
             - `Intonaco-v${{ steps.version.outputs.version }}-win-x64-setup.exe` — Windows installer.

@@ -107,6 +107,10 @@ namespace Intonaco.Views
             _systemEvents = new SystemEventMonitor();
 
             InitializeComponent();
+            // The default window is intentionally narrow and tall, as shown in
+            // the Store screenshots. Keep it inside the usable screen area on
+            // laptops and displays with scaling or a larger taskbar.
+            Height = CalculateInitialWindowHeight(SystemParameters.WorkArea.Height, MinHeight);
             RecentList.ItemsSource = _recentWallpapers;
 
             // Footer version comes from the assembly, so it can never drift
@@ -124,12 +128,21 @@ namespace Intonaco.Views
             // here alone would still flash the window. Suppress activation now
             // and hide at SourceInitialized, which fires while the HWND is
             // being created and before the window is ever presented.
-            _startMinimized = _settings.StartMinimized || StartupManager.ShouldStartMinimized();
+            // A manual click on the app must always open its controls. The
+            // saved startup preference is honoured by StartupManager when
+            // Windows launches the app at sign-in, not on every manual launch.
+            _startMinimized = StartupManager.ShouldStartMinimized();
+#if INTONACO_STORE
+            _startMinimized |= StoreStartupManager.IsStartupActivation() &&
+                               _settings.StartMinimized;
+#endif
             if (_startMinimized)
             {
                 ShowActivated = false;
                 ShowInTaskbar = false;
-                WindowState = WindowState.Minimized;
+                // Never put the hidden window into a minimized WPF state.
+                // WPF can otherwise re-show the minimized HWND before it is
+                // restored and leave the controls unpainted / black.
                 SourceInitialized += OnStartMinimizedSourceInitialized;
                 DebugLog.Write(
                     "Start minimized: launching silently in the system tray " +
@@ -154,6 +167,12 @@ namespace Intonaco.Views
                 DebugLog.Write($"AutoPlay: last wallpaper not found: {_settings.LastWallpaperPath}");
             }
         }
+
+        // WPF dimensions are device-independent units. Clamp only the startup
+        // height; resizing/maximizing remains fully supported afterward.
+        internal static double CalculateInitialWindowHeight(
+            double workAreaHeight, double minHeight) =>
+            Math.Max(minHeight, Math.Min(1080, workAreaHeight - 24));
 
         private static IWallpaperPlayer CreatePlayer(string backend) =>
             AppSettings.NormalizeBackend(backend) == "MPV"
@@ -205,7 +224,11 @@ namespace Intonaco.Views
             // persisted in settings.json and restored on every launch.
             SelectComboByTag(BackgroundAnimationComboBox, _settings.BackgroundAnimationMode);
 
+#if INTONACO_STORE
+            StartWithWindowsToggle.IsChecked = _settings.StartWithWindows;
+#else
             StartWithWindowsToggle.IsChecked = StartupManager.IsRegistered;
+#endif
             StartMinimizedToggle.IsChecked = _settings.StartMinimized;
             AutoPlayToggle.IsChecked = _settings.AutoPlay;
             LoopToggle.IsChecked = _settings.LoopPlayback;
@@ -296,6 +319,21 @@ namespace Intonaco.Views
 
             _systemEvents.Start();
             UpdateTitleBarTheme();
+
+            // Upgrade old registration commands that always forced a tray
+            // launch, even if the current preference wants a visible window.
+#if INTONACO_STORE
+            _ = RefreshStoreStartupToggleAsync();
+#else
+            if (StartupManager.IsRegistered)
+            {
+                string registered = StartupManager.GetRegisteredValue() ?? "";
+                bool registeredMinimized = registered.Contains(
+                    "--minimized", StringComparison.OrdinalIgnoreCase);
+                if (registeredMinimized != _settings.StartMinimized)
+                    StartupManager.Register(_settings.StartMinimized);
+            }
+#endif
 
             _placementTimer = new DispatcherTimer(DispatcherPriority.Background)
             {
@@ -1399,14 +1437,64 @@ namespace Intonaco.Views
         {
             if (_suppressEvents) return;
 
+#if INTONACO_STORE
+            _ = ApplyStoreStartupPreferenceAsync(StartWithWindowsToggle.IsChecked == true);
+#else
             if (StartWithWindowsToggle.IsChecked == true)
-                StartupManager.Register();
+                StartupManager.Register(_settings.StartMinimized);
             else
                 StartupManager.Unregister();
 
             _settings.StartWithWindows = StartWithWindowsToggle.IsChecked == true;
             _settings.Save();
+#endif
         }
+
+#if INTONACO_STORE
+        private async System.Threading.Tasks.Task RefreshStoreStartupToggleAsync()
+        {
+            try
+            {
+                bool enabled = await StoreStartupManager.IsEnabledAsync();
+                if (_isExiting) return;
+                _suppressEvents = true;
+                StartWithWindowsToggle.IsChecked = enabled;
+                _settings.StartWithWindows = enabled;
+                _settings.Save();
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Store startup status could not be read: " + ex.Message);
+            }
+            finally
+            {
+                _suppressEvents = false;
+            }
+        }
+
+        private async System.Threading.Tasks.Task ApplyStoreStartupPreferenceAsync(bool enabled)
+        {
+            try
+            {
+                bool actual = await StoreStartupManager.SetEnabledAsync(enabled);
+                _suppressEvents = true;
+                StartWithWindowsToggle.IsChecked = actual;
+                _settings.StartWithWindows = actual;
+                _settings.Save();
+                if (actual != enabled)
+                    ShowError("Windows has disabled startup for Intonaco Wallpaper. Enable it in Settings > Apps > Startup.");
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Store startup preference update failed: " + ex.Message);
+                ShowError("Could not update Windows startup. Check Settings > Apps > Startup.");
+            }
+            finally
+            {
+                _suppressEvents = false;
+            }
+        }
+#endif
 
         private void OnBackendChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -1535,6 +1623,10 @@ namespace Intonaco.Views
             if (_suppressEvents) return;
             _settings.StartMinimized = StartMinimizedToggle.IsChecked == true;
             _settings.Save();
+#if !INTONACO_STORE
+            if (StartupManager.IsRegistered)
+                StartupManager.Register(_settings.StartMinimized);
+#endif
         }
 
         private void OnAutoPlayChanged(object sender, RoutedEventArgs e)
@@ -2015,6 +2107,8 @@ namespace Intonaco.Views
         {
             SourceInitialized -= OnStartMinimizedSourceInitialized;
             _startMinimized = false;
+            // Hide before the first paint without storing WindowState.Minimized.
+            // Explicit restore must start from a clean WindowState.Normal.
             ShowInTaskbar = false;
             Hide();
             DebugLog.Write("Start minimized: window suppressed, running from the tray.");
@@ -2053,13 +2147,31 @@ namespace Intonaco.Views
 
         private void ShowMainWindow()
         {
-            Show();
-            ShowInTaskbar = true;
+            if (_isExiting)
+                return;
+
+            // IMPORTANT: WPF must not Show() while WindowState is Minimized.
+            // Showing first can re-hide the HWND through StateChanged and leave
+            // a black / inactive window. Restore the state before showing.
+            ShowActivated = true;
             WindowState = WindowState.Normal;
+            ShowInTaskbar = true;
+            Show();
             Activate();
-            Focus();
-            RefreshPreviewForCurrentState();
-            UpdateSeekTimer();
+
+            // A minimized startup window or a second-instance signal can
+            // arrive before first layout. Refresh after the restored HWND has
+            // completed layout and is ready to paint.
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)(() =>
+            {
+                if (_isExiting || !IsVisible || WindowState == WindowState.Minimized)
+                    return;
+                Activate();
+                Focus();
+                InvalidateVisual();
+                RefreshPreviewForCurrentState();
+                UpdateSeekTimer();
+            }));
         }
 
         #endregion

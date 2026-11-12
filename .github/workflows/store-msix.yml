@@ -1,0 +1,87 @@
+name: Store MSIX
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'store/**'
+      - '.github/workflows/store-msix.yml'
+  workflow_dispatch:
+    inputs:
+      package_identity_name:
+        description: 'Exact Partner Center Package Identity Name'
+        required: false
+        type: string
+      publisher_distinguished_name:
+        description: 'Exact Publisher DN from Partner Center, starting with CN='
+        required: false
+        type: string
+      publisher_display_name:
+        description: 'Exact Partner Center publisher display name'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  store-msix:
+    name: Validate Windows Store package
+    runs-on: windows-latest
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore Store build
+        run: dotnet restore src/Intonaco/Intonaco.csproj /p:StoreBuild=true
+      - name: Publish Store app
+        run: >-
+          dotnet publish src/Intonaco/Intonaco.csproj -c Release -r win-x64
+          --self-contained true /p:StoreBuild=true /p:PublishSingleFile=false
+          /p:PublishReadyToRun=true -o artifacts/store-app
+      - name: Build and validate MSIX
+        shell: pwsh
+        env:
+          STORE_ID: ${{ inputs.package_identity_name }}
+          STORE_PUBLISHER: ${{ inputs.publisher_distinguished_name }}
+          STORE_DISPLAY_PUBLISHER: ${{ inputs.publisher_display_name }}
+        run: |
+          $count = 0
+          foreach ($value in @($env:STORE_ID, $env:STORE_PUBLISHER, $env:STORE_DISPLAY_PUBLISHER)) {
+            if (-not [string]::IsNullOrWhiteSpace($value)) { $count++ }
+          }
+          if ($count -notin @(0, 3)) {
+            throw 'Provide all three exact Partner Center identity fields or leave all blank for a preview.'
+          }
+          if ($count -eq 0) {
+            $identity = 'IntonacoWallpaper.DevelopmentPreview'
+            $publisher = 'CN=IntonacoWallpaperDevelopmentPreview'
+            $display = 'Intonaco Wallpaper Preview'
+            Write-Warning 'PREVIEW IDENTITY ONLY. Do not upload this artifact to Partner Center.'
+          } else {
+            $identity = $env:STORE_ID
+            $publisher = $env:STORE_PUBLISHER
+            $display = $env:STORE_DISPLAY_PUBLISHER
+          }
+          [xml]$project = Get-Content -LiteralPath src/Intonaco/Intonaco.csproj
+          $version = [string]($project.Project.PropertyGroup.Version |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -First 1)
+          $output = "artifacts/store/IntonacoWallpaper-v$version-win-x64.msix"
+          & ./store/Build-StorePackage.ps1 `
+            -PublishDir artifacts/store-app `
+            -PackageIdentityName $identity `
+            -PublisherDistinguishedName $publisher `
+            -PublisherDisplayName $display `
+            -Version "$version.0" `
+            -OutputPath $output
+      - name: Upload unsigned MSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: IntonacoWallpaper-MSIX-unsigned
+          path: artifacts/store/*.msix
+          if-no-files-found: error
+          retention-days: 14

@@ -4,6 +4,29 @@ All notable changes to Intonaco are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] — 2026-11-12
+
+A focused Windows startup and window-restoration update.
+
+### Fixed
+- Opening Intonaco manually no longer inherits the stored Start minimized preference,
+  so Start menu and desktop shortcut launches bring up the control window.
+- Restore a minimized/hidden WPF window to Normal **before** showing and
+  activating it, avoiding a race that could leave an unpainted black window.
+- Refresh the video preview after window layout on restore; the desktop player
+  remains independent.
+- Respect the Start minimized preference for actual Windows sign-in launches
+  and update existing startup entries that were registered with stale flags.
+
+### Improved
+- Default window is a narrow, tall 620-DIP control panel like the original
+  compact design; height is capped to available screen work area, with full
+  resizing, maximizing and scrolling still supported.
+- Regression checks cover normal/automatic startup flags and default sizing.
+- Separate, preview-only MSIX packaging support for **Intonaco Wallpaper**.
+  Store-ready identity and publisher must come from Partner Center; real
+  Windows device validation and Store certification are still required.
+
 ## [2.1.0] — 2026-11-12
 
 A native-interface refresh with safer video compatibility and leaner UI activity.
