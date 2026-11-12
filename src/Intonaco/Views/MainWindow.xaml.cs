@@ -124,12 +124,17 @@ namespace Intonaco.Views
             // here alone would still flash the window. Suppress activation now
             // and hide at SourceInitialized, which fires while the HWND is
             // being created and before the window is ever presented.
-            _startMinimized = _settings.StartMinimized || StartupManager.ShouldStartMinimized();
+            // A manual click on the app must always open its controls. The
+            // saved startup preference is honoured by StartupManager when
+            // Windows launches the app at sign-in, not on every manual launch.
+            _startMinimized = StartupManager.ShouldStartMinimized();
             if (_startMinimized)
             {
                 ShowActivated = false;
                 ShowInTaskbar = false;
-                WindowState = WindowState.Minimized;
+                // Never put the hidden window into a minimized WPF state.
+                // WPF can otherwise re-show the minimized HWND before it is
+                // restored and leave the controls unpainted / black.
                 SourceInitialized += OnStartMinimizedSourceInitialized;
                 DebugLog.Write(
                     "Start minimized: launching silently in the system tray " +
@@ -1535,6 +1540,8 @@ namespace Intonaco.Views
             if (_suppressEvents) return;
             _settings.StartMinimized = StartMinimizedToggle.IsChecked == true;
             _settings.Save();
+            if (StartupManager.IsRegistered)
+                StartupManager.Register(_settings.StartMinimized);
         }
 
         private void OnAutoPlayChanged(object sender, RoutedEventArgs e)
@@ -2015,6 +2022,8 @@ namespace Intonaco.Views
         {
             SourceInitialized -= OnStartMinimizedSourceInitialized;
             _startMinimized = false;
+            // Hide before the first paint without storing WindowState.Minimized.
+            // Explicit restore must start from a clean WindowState.Normal.
             ShowInTaskbar = false;
             Hide();
             DebugLog.Write("Start minimized: window suppressed, running from the tray.");
@@ -2053,13 +2062,30 @@ namespace Intonaco.Views
 
         private void ShowMainWindow()
         {
-            Show();
-            ShowInTaskbar = true;
+            if (_isExiting)
+                return;
+
+            // IMPORTANT: WPF must not Show() while WindowState is Minimized.
+            // Showing first can re-hide the HWND through StateChanged and leave
+            // a black / inactive window. Restore the state before showing.
+            ShowActivated = true;
             WindowState = WindowState.Normal;
+            ShowInTaskbar = true;
+            Show();
             Activate();
-            Focus();
-            RefreshPreviewForCurrentState();
-            UpdateSeekTimer();
+
+            // A minimized startup window or a second-instance signal can
+            // arrive before first layout. Refresh after the restored HWND has
+            // completed layout and is ready to paint.
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)(() =>
+            {
+                if (_isExiting || !IsVisible || WindowState == WindowState.Minimized)
+                    return;
+                Activate();
+                Focus();
+                RefreshPreviewForCurrentState();
+                UpdateSeekTimer();
+            }));
         }
 
         #endregion
