@@ -94,6 +94,36 @@ namespace Intonaco.Tests
         }
 
         [Fact]
+        public async Task MlwVideoWrapperWithVerifiableMp4PayloadIsUnwrapped()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "IntonacoMlwTest-" + Guid.NewGuid());
+            Directory.CreateDirectory(root);
+            try
+            {
+                string source = Path.Combine(root, "wrapped.mlw");
+                var payload = new byte[24];
+                Array.Copy(Mp4Signature, payload, Mp4Signature.Length);
+                using (var stream = File.Create(source))
+                {
+                    stream.Write(Encoding.ASCII.GetBytes("MLW.VIDEO"));
+                    stream.Write(new byte[7]); // Bounded wrapper metadata.
+                    stream.Write(payload);
+                }
+
+                Assert.Equal(16, MlwMediaSupport.FindEmbeddedMp4Offset(source));
+                string extracted = await MlwMediaSupport.PrepareAsync(source,
+                    CancellationToken.None, Path.Combine(root, "cache"));
+                Assert.EndsWith(".mp4", extracted);
+                Assert.Equal(payload, await File.ReadAllBytesAsync(extracted));
+                Assert.Equal((byte)'M', (await File.ReadAllBytesAsync(source))[0]);
+            }
+            finally
+            {
+                Directory.Delete(root, true);
+            }
+        }
+
+        [Fact]
         public async Task CanceledImportDoesNotCreateDecoderOutput()
         {
             var root = Path.Combine(Path.GetTempPath(), "IntonacoMlwTest-" + Guid.NewGuid());
