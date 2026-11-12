@@ -28,7 +28,8 @@ namespace Intonaco.Core
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool DestroyWindow(IntPtr hwnd);
 
-        internal IntPtr Handle { get; private set; }
+        // This is the hosted child HWND for mpv, not HwndHost's own handle.
+        internal new IntPtr Handle { get; private set; }
 
         protected override HandleRef BuildWindowCore(HandleRef parent)
         {
