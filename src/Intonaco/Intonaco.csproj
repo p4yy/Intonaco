@@ -7,9 +7,9 @@
     <ApplicationIcon>Assets\intonaco.ico</ApplicationIcon>
     <AssemblyName>Intonaco</AssemblyName>
     <RootNamespace>Intonaco</RootNamespace>
-    <Title>Intonaco</Title>
-    <Product>Intonaco</Product>
-    <Description>Lightweight live wallpaper for Windows 11</Description>
+    <Title>Intonaco Wallpaper</Title>
+    <Product>Intonaco Wallpaper</Product>
+    <Description>Live video wallpapers for Windows 10 and 11</Description>
     <Company>Acev Dev Co</Company>
     <Copyright>Copyright © 2026 Intonaco Contributors</Copyright>
     <Authors>Intonaco Contributors</Authors>
