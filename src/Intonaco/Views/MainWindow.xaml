@@ -357,7 +357,7 @@
                         <ItemsControl x:Name="RecentList" HorizontalContentAlignment="Stretch">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Columns="2" />
+                                    <UniformGrid Columns="1" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -410,6 +410,118 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Discover: URLs are copied, never opened automatically.
+                     The section stays collapsed until the user needs it. -->
+                <Border Style="{StaticResource CardBorder}"
+                        Padding="0" Margin="0,16,0,0">
+                    <StackPanel>
+                        <Button Style="{StaticResource GhostButton}"
+                                Click="OnToggleWallpaperSources"
+                                HorizontalContentAlignment="Stretch"
+                                Height="62" Padding="16,8"
+                                ToolTip="Show or hide places to find wallpaper videos">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Get live wallpapers"
+                                               Style="{StaticResource SettingTitleText}" />
+                                    <TextBlock Text="Find a video, copy its source, then add the downloaded file"
+                                               Style="{StaticResource SettingDescriptionText}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBlock x:Name="WallpaperSourcesChevron"
+                                           Grid.Column="1"
+                                           Text="&#xE70D;"
+                                           FontFamily="{StaticResource IconFont}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="16" VerticalAlignment="Center"
+                                           Margin="12,0,0,0" />
+                            </Grid>
+                        </Button>
+                        <StackPanel x:Name="WallpaperSourcesPanel"
+                                    Visibility="Collapsed" Margin="16,0,16,12">
+                            <Border Height="1" Margin="0,0,0,8"
+                                    Background="{DynamicResource DividerBrush}" />
+                            <TextBlock Text="Choose a source to copy its website address. No browser opens automatically."
+                                       Style="{StaticResource SettingDescriptionText}"
+                                       TextWrapping="Wrap" Margin="0,0,0,8" />
+
+                            <Grid Margin="0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="MotionBGs" Style="{StaticResource SettingTitleText}" />
+                                    <TextBlock Text="4K, anime, games and nature"
+                                               Style="{StaticResource SettingDescriptionText}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Copy link" Tag="https://motionbgs.com/"
+                                        Style="{StaticResource GhostButton}" Click="OnCopyWallpaperSource"
+                                        MinWidth="96" Height="32" />
+                            </Grid>
+                            <Border Height="1" Background="{DynamicResource DividerBrush}" />
+
+                            <Grid Margin="0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="MyLiveWallpapers" Style="{StaticResource SettingTitleText}" />
+                                    <TextBlock Text="Anime, gaming and abstract loops"
+                                               Style="{StaticResource SettingDescriptionText}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Copy link" Tag="https://mylivewallpapers.com/"
+                                        Style="{StaticResource GhostButton}" Click="OnCopyWallpaperSource"
+                                        MinWidth="96" Height="32" />
+                            </Grid>
+                            <Border Height="1" Background="{DynamicResource DividerBrush}" />
+
+                            <Grid Margin="0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="MoeWalls" Style="{StaticResource SettingTitleText}" />
+                                    <TextBlock Text="Anime and illustrated live wallpapers"
+                                               Style="{StaticResource SettingDescriptionText}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Copy link" Tag="https://moewalls.com/"
+                                        Style="{StaticResource GhostButton}" Click="OnCopyWallpaperSource"
+                                        MinWidth="96" Height="32" />
+                            </Grid>
+                            <Border Height="1" Background="{DynamicResource DividerBrush}" />
+
+                            <Grid Margin="0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Pexels Videos" Style="{StaticResource SettingTitleText}" />
+                                    <TextBlock Text="Nature and free stock video loops"
+                                               Style="{StaticResource SettingDescriptionText}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Copy link" Tag="https://www.pexels.com/search/videos/loop/"
+                                        Style="{StaticResource GhostButton}" Click="OnCopyWallpaperSource"
+                                        MinWidth="96" Height="32" />
+                            </Grid>
+                            <TextBlock Text="Independent websites. Check each download format and usage rights. Intonaco uses local video files."
+                                       Style="{StaticResource SettingDescriptionText}"
+                                       TextWrapping="Wrap" Margin="0,10,0,0" />
+                            <TextBlock x:Name="WallpaperSourceCopyStatus" Text=""
+                                       Style="{StaticResource CaptionText}"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       Margin="0,6,0,0" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
