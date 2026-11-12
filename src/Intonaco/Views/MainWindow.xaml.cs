@@ -128,6 +128,10 @@ namespace Intonaco.Views
             // saved startup preference is honoured by StartupManager when
             // Windows launches the app at sign-in, not on every manual launch.
             _startMinimized = StartupManager.ShouldStartMinimized();
+#if INTONACO_STORE
+            _startMinimized |= StoreStartupManager.IsStartupActivation() &&
+                               _settings.StartMinimized;
+#endif
             if (_startMinimized)
             {
                 ShowActivated = false;
@@ -210,7 +214,11 @@ namespace Intonaco.Views
             // persisted in settings.json and restored on every launch.
             SelectComboByTag(BackgroundAnimationComboBox, _settings.BackgroundAnimationMode);
 
+#if INTONACO_STORE
+            StartWithWindowsToggle.IsChecked = _settings.StartWithWindows;
+#else
             StartWithWindowsToggle.IsChecked = StartupManager.IsRegistered;
+#endif
             StartMinimizedToggle.IsChecked = _settings.StartMinimized;
             AutoPlayToggle.IsChecked = _settings.AutoPlay;
             LoopToggle.IsChecked = _settings.LoopPlayback;
@@ -304,6 +312,9 @@ namespace Intonaco.Views
 
             // Upgrade old registration commands that always forced a tray
             // launch, even if the current preference wants a visible window.
+#if INTONACO_STORE
+            _ = RefreshStoreStartupToggleAsync();
+#else
             if (StartupManager.IsRegistered)
             {
                 string registered = StartupManager.GetRegisteredValue() ?? "";
@@ -312,6 +323,7 @@ namespace Intonaco.Views
                 if (registeredMinimized != _settings.StartMinimized)
                     StartupManager.Register(_settings.StartMinimized);
             }
+#endif
 
             _placementTimer = new DispatcherTimer(DispatcherPriority.Background)
             {
@@ -1415,6 +1427,9 @@ namespace Intonaco.Views
         {
             if (_suppressEvents) return;
 
+#if INTONACO_STORE
+            _ = ApplyStoreStartupPreferenceAsync(StartWithWindowsToggle.IsChecked == true);
+#else
             if (StartWithWindowsToggle.IsChecked == true)
                 StartupManager.Register(_settings.StartMinimized);
             else
@@ -1422,7 +1437,54 @@ namespace Intonaco.Views
 
             _settings.StartWithWindows = StartWithWindowsToggle.IsChecked == true;
             _settings.Save();
+#endif
         }
+
+#if INTONACO_STORE
+        private async System.Threading.Tasks.Task RefreshStoreStartupToggleAsync()
+        {
+            try
+            {
+                bool enabled = await StoreStartupManager.IsEnabledAsync();
+                if (_isExiting) return;
+                _suppressEvents = true;
+                StartWithWindowsToggle.IsChecked = enabled;
+                _settings.StartWithWindows = enabled;
+                _settings.Save();
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Store startup status could not be read: " + ex.Message);
+            }
+            finally
+            {
+                _suppressEvents = false;
+            }
+        }
+
+        private async System.Threading.Tasks.Task ApplyStoreStartupPreferenceAsync(bool enabled)
+        {
+            try
+            {
+                bool actual = await StoreStartupManager.SetEnabledAsync(enabled);
+                _suppressEvents = true;
+                StartWithWindowsToggle.IsChecked = actual;
+                _settings.StartWithWindows = actual;
+                _settings.Save();
+                if (actual != enabled)
+                    ShowError("Windows has disabled startup for Intonaco Wallpaper. Enable it in Settings > Apps > Startup.");
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Store startup preference update failed: " + ex.Message);
+                ShowError("Could not update Windows startup. Check Settings > Apps > Startup.");
+            }
+            finally
+            {
+                _suppressEvents = false;
+            }
+        }
+#endif
 
         private void OnBackendChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -1551,8 +1613,10 @@ namespace Intonaco.Views
             if (_suppressEvents) return;
             _settings.StartMinimized = StartMinimizedToggle.IsChecked == true;
             _settings.Save();
+#if !INTONACO_STORE
             if (StartupManager.IsRegistered)
                 StartupManager.Register(_settings.StartMinimized);
+#endif
         }
 
         private void OnAutoPlayChanged(object sender, RoutedEventArgs e)
