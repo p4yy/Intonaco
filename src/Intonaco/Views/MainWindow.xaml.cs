@@ -32,6 +32,10 @@ namespace Intonaco.Views
             new ObservableCollection<RecentWallpaperItem>();
         private string _fileInfoBase = string.Empty;
         private string? _previewFilePath;
+        private bool _livePreviewEnabled;
+        private int _previewThumbnailVersion;
+        private string? _thumbnailRequestedFor;
+        private BitmapSource? _thumbnailImage;
         private string? _activeOriginalFile;
         private int _sourceWidth;
         private int _sourceHeight;
@@ -878,13 +882,28 @@ namespace Intonaco.Views
 
         private void UpdatePreview(string filePath)
         {
+            // Keep one video decoder by default: use an OS thumbnail until
+            // the user explicitly opts into a moving preview.
             _previewFilePath = filePath;
+            _livePreviewEnabled = false;
+            _thumbnailRequestedFor = null;
+            _thumbnailImage = null;
+            ++_previewThumbnailVersion;
+            PreviewModeButton.Content = "Play live preview";
+            PreviewModeButton.Visibility = _player is MpvWallpaperPlayer
+                ? Visibility.Collapsed : Visibility.Visible;
             RefreshPreviewForCurrentState();
         }
 
         private void ClearPreview()
         {
             _previewFilePath = null;
+            _livePreviewEnabled = false;
+            _thumbnailImage = null;
+            _thumbnailRequestedFor = null;
+            ++_previewThumbnailVersion;
+            PreviewModeButton.Visibility = Visibility.Collapsed;
+            PreviewModeButton.Content = "Play live preview";
             _previewNeedsPositionSync = false;
             ReleasePreviewPipeline();
             PreviewImage.Source = null;
@@ -901,16 +920,13 @@ namespace Intonaco.Views
         /// </summary>
         private void RefreshPreviewForCurrentState()
         {
-            // MPV's desktop surface is the only MPV decoder. Avoid starting
-            // a separate MediaElement that may not understand MPV-only codecs.
+            // Shell thumbnails also work when the desktop uses MPV;
+            // never start an additional Windows video decoder for MPV files.
             if (_player is MpvWallpaperPlayer)
             {
-                ReleasePreviewPipeline();
-                PreviewImage.Source = null;
-                PreviewImage.Visibility = Visibility.Collapsed;
-                PreviewPlaceholder.Visibility = Visibility.Visible;
-                PreviewHintText.Text =
-                    "MPV renders on your desktop without a second preview decoder.";
+                _livePreviewEnabled = false;
+                PreviewModeButton.Visibility = Visibility.Collapsed;
+                ShowStaticPreview();
                 return;
             }
             if (_previewFilePath == null)
@@ -922,13 +938,21 @@ namespace Intonaco.Views
                 return;
             }
 
+            if (!_livePreviewEnabled)
+            {
+                ShowStaticPreview();
+                return;
+            }
+
             PreviewPlaceholder.Visibility = Visibility.Collapsed;
 
             if (!IsPreviewWindowVisible)
             {
-                ReleasePreviewPipeline();
-                PreviewImage.Source = null;
-                PreviewImage.Visibility = Visibility.Collapsed;
+                // Releasing the optional decoder on focus loss is safe;
+                // the thumbnail remains available with no black flash.
+                _livePreviewEnabled = false;
+                PreviewModeButton.Content = "Play live preview";
+                ShowStaticPreview();
                 return;
             }
 
@@ -950,7 +974,8 @@ namespace Intonaco.Views
 
         private void StartPreview()
         {
-            if (_previewFilePath == null || !IsPreviewWindowVisible ||
+            if (!_livePreviewEnabled || _previewFilePath == null ||
+                !IsPreviewWindowVisible ||
                 _player.CurrentState != WallpaperPlayer.PlaybackState.Playing)
             {
                 return;
@@ -979,9 +1004,19 @@ namespace Intonaco.Views
                 // simply told to play again from its current frame.
                 PreviewMedia.Play();
                 PreviewMedia.Visibility = Visibility.Visible;
-                PreviewImage.Source = null;
-                PreviewImage.Visibility = Visibility.Collapsed;
-                PreviewPlaceholder.Visibility = Visibility.Collapsed;
+                // Keep the cached thumbnail over the decoder until MediaOpened.
+                // This prevents the large black rectangle during initialization.
+                if (_thumbnailImage == null)
+                {
+                    PreviewImage.Visibility = Visibility.Collapsed;
+                    PreviewPlaceholder.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    PreviewImage.Source = _thumbnailImage;
+                    PreviewImage.Visibility = Visibility.Visible;
+                    PreviewPlaceholder.Visibility = Visibility.Collapsed;
+                }
             }
             catch
             {
@@ -1062,6 +1097,11 @@ namespace Intonaco.Views
 
         private void OnPreviewMediaOpened(object sender, RoutedEventArgs e)
         {
+            if (!_livePreviewEnabled)
+                return;
+
+            PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewPlaceholder.Visibility = Visibility.Collapsed;
             if (_player.CurrentState == WallpaperPlayer.PlaybackState.Paused)
             {
                 // A preview reopened while paused must show the desktop's
