@@ -150,15 +150,17 @@ jobs:
           body: |
             ## Intonaco Wallpaper v${{ steps.version.outputs.version }}
 
-            Discover live wallpaper sources from Intonaco Wallpaper, and reliably restore from desktop shortcuts.
+            A stability-focused update for smoother playback and a reliable in-app preview.
 
-            ### Highlights
-            - New, compact **Get live wallpapers** section with copyable addresses for six trusted third-party catalogs.
-            - Copy actions never auto-redirect or open a browser; supported videos are opened locally after download.
-            - Desktop shortcut re-launch signals are preserved even during initial window loading.
-            - Single-column recent items stay clean at the compact default window size.
-            - Branded installer panel uses the official Intonaco logo and lists publisher **Acev Dev Co**.
-            - No new background network activity or playback overhead.
+            ### What's improved
+            - Still-image thumbnail preview by default: no continuously running second video decoder while wallpaper playback is active.
+            - **Play live preview** is an optional control, with a still-image fallback when Windows can't decode or display the preview.
+            - `.mlw` files can be selected and imported when they contain standard video, ZIP-wrapped video, or a verifiable embedded MP4 stream.
+            - MLW imports preserve their original file and run preparation away from the UI thread.
+            - Unsupported/protected proprietary MLW variants are clearly identified rather than falsely reported as playable.
+            - Original Intonaco logo, clean Windows installer, and **Acev Dev Co** metadata retained.
+
+            **Compatibility:** Not every MyLiveWallpapers `.mlw` file can be decoded. Some proprietary variants require the creator's player. Download an MP4 version when available.
 
             ### Download
             - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64-setup.exe` — Windows installer.
