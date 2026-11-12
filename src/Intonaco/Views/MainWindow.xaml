@@ -4,7 +4,7 @@
         xmlns:tb="http://www.hardcodet.net/taskbar"
         Title="Intonaco"
         Icon="/Assets/intonaco.ico"
-        Width="700" Height="720"
+        Width="900" Height="780"
         MinWidth="620" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBackgroundBrush}"
@@ -31,7 +31,7 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Grid Grid.Row="0" Margin="28,18,28,14">
+        <Grid Grid.Row="0" Margin="28,18,28,14" MaxWidth="1060">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -96,7 +96,7 @@
                       VerticalScrollBarVisibility="Auto"
                       CanContentScroll="False"
                       PanningMode="VerticalOnly">
-            <StackPanel Margin="28,4,28,24">
+            <StackPanel Margin="28,4,28,24" MaxWidth="1060" HorizontalAlignment="Stretch">
 
                 <!-- Wallpaper -->
                 <TextBlock Text="Now playing"
@@ -105,7 +105,8 @@
 
                 <Border Style="{StaticResource CardBorder}" Padding="0" ClipToBounds="True">
                     <StackPanel>
-                        <Grid Height="230">
+                        <Grid x:Name="PreviewPanel" Height="300"
+                              SizeChanged="OnPreviewPanelSizeChanged">
                             <Border Background="{DynamicResource PreviewBackgroundBrush}"
                                     CornerRadius="12,12,0,0" />
 
