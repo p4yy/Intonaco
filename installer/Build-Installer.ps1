@@ -75,9 +75,8 @@ if (-not $iscc) {
 # Generate both wizard images from the exact app icon on each clean build.
 # BMP works with every supported Inno Setup 6 compiler, including CI.
 & (Join-Path $PSScriptRoot "Generate-Branding.ps1")
-if ($LASTEXITCODE -ne 0) {
-    throw "Installer artwork generation failed."
-}
+# The script uses PowerShell/.NET only; there is no native exit code.
+# A terminating PowerShell error is automatically promoted by Stop.
 
 $scriptPath = Join-Path $PSScriptRoot "Intonaco.iss"
 Write-Host "Building installer with $iscc"
