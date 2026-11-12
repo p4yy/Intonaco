@@ -185,7 +185,8 @@ namespace Intonaco.Core
 
         public FrameworkElement CreateHost()
         {
-            _host?.Dispose();
+            if (_host != null)
+                _host.Dispose();
             _host = new MpvWindowHost
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -287,7 +288,7 @@ namespace Intonaco.Core
             catch (Exception ex)
             {
                 Stop();
-                ReportError("Could not launch MPV: " + ex.Message);
+                ErrorOccurred?.Invoke("Could not launch MPV: " + ex.Message);
                 return false;
             }
         }
@@ -334,6 +335,10 @@ namespace Intonaco.Core
                 await SendAsync(new object[] { "observe_property", 3, "pause" });
                 await SendAsync(new object[] { "get_property", "duration" });
                 await SendAsync(new object[] { "get_property", "video-params" });
+                // The wallpaper can be paused by system focus policy before
+                // the named pipe is ready; mirror state once connected.
+                await SendAsync(new object[] { "set_property", "pause",
+                    CurrentState == WallpaperPlayer.PlaybackState.Paused });
 
                 using var reader = new StreamReader(client,
                     new System.Text.UTF8Encoding(false),
@@ -387,7 +392,26 @@ namespace Intonaco.Core
 
                 if (eventName == "file-loaded")
                 {
-                    _dispatcher.BeginInvoke(() => NotifyOpened());
+                    _dispatcher.BeginInvoke(() =>
+                    {
+                        if (_filePath == null) return;
+                        NotifyOpened();
+                        if (_positionSeconds > 0)
+                            Seek(TimeSpan.FromSeconds(_positionSeconds));
+                        if (CurrentState == WallpaperPlayer.PlaybackState.Paused)
+                            Send("set_property", "pause", true);
+                    });
+                    return;
+                }
+                if (eventName == "end-file" && !_loop &&
+                    root.TryGetProperty("reason", out var endReason) &&
+                    endReason.GetString() == "eof")
+                {
+                    _dispatcher.BeginInvoke(() =>
+                    {
+                        if (CurrentState == WallpaperPlayer.PlaybackState.Playing)
+                            Pause();
+                    });
                     return;
                 }
 
@@ -491,7 +515,8 @@ namespace Intonaco.Core
                 }
             }
             catch (Exception ex) when (ex is OperationCanceledException
-                                      or IOException or ObjectDisposedException)
+                                      or IOException or ObjectDisposedException
+                                      or InvalidOperationException)
             {
                 // Process shutdown races must not crash the WPF dispatcher.
             }
@@ -578,8 +603,9 @@ namespace Intonaco.Core
                 finally { process.Dispose(); }
             }
 
-            _host?.Dispose();
-            _host = null;
+            // Keep the HWND host until the WPF player window is unloaded.
+            // Play() calls Stop() to replace a source, and disposing its
+            // host here would make every first MPV playback fail.
             _filePath = null;
             _opened = false;
             _positionSeconds = 0;
@@ -594,6 +620,8 @@ namespace Intonaco.Core
         {
             if (_disposed) return;
             Stop();
+            _host?.Dispose();
+            _host = null;
             _disposed = true;
             _sendLock.Dispose();
         }
