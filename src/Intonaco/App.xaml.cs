@@ -185,8 +185,8 @@ namespace Intonaco
             catch { /* Logging must never throw. */ }
 
             MessageBox.Show(
-                "Intonaco hit an unexpected error but will keep running.\n\n" + e.Exception.Message,
-                "Intonaco", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Intonaco Wallpaper hit an unexpected error but will keep running.\n\n" + e.Exception.Message,
+                "Intonaco Wallpaper", MessageBoxButton.OK, MessageBoxImage.Warning);
             e.Handled = true;
         }
     }
