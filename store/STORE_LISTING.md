@@ -14,6 +14,8 @@ to the GitHub installer or require GitHub to install or update the app.
 - **Application version:** 2.1.2.0 (Store MSIX version; once verified)
 - **Pricing:** Set explicitly in Partner Center; do not assume free
 - **Rating/content declaration:** Answer Partner Center's questionnaire accurately
+- **Privacy policy URL:** https://github.com/p4yy/Intonaco/blob/main/docs/PRIVACY.md (valid after the Store PR is merged)
+- **Support URL:** https://github.com/p4yy/Intonaco/issues
 
 ## Short description
 Bring your desktop to life with video wallpapers.
@@ -58,7 +60,7 @@ built in; an optional MPV engine may be used when separately installed.
    single-instance shortcut activation, wallpaper playback, pause and tray.
 7. Add **real** 16:9 screenshots of the actual software using wallpapers
    you are authorized to display, plus the exact official Intonaco app icon.
-8. Set the support contact, privacy-policy URL if required, markets,
+8. Use the published privacy policy and support links above, then set markets,
    category, pricing, age/content ratings and accessibility disclosures.
 9. Confirm that Store package certification passes before announcing availability.
 
