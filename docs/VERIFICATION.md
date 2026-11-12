@@ -251,33 +251,36 @@ for repeatable comparisons:
   future release.
 
 
-## Format compatibility smoke test (native + optional FFmpeg)
+## Native media engine smoke test
 
-Run the following **on Windows hardware** with actual short test clips; the
-CI suite validates the application and extension routing but cannot guarantee
-which third-party codecs a Windows installation provides.
+Automated tests cover file preflight, container signature identification and
+error classification. **Actual video decoding and hardware performance must
+be verified on Windows hardware** with the installed Media Foundation codecs.
 
-1. Without `ffmpeg.exe`, verify H.264 MP4 works through the native
-   Media Foundation decoder. Check that the settings preview closes after
-   minimizing Intonaco to the tray.
-2. Try H.264 MKV and VP9 WebM natively. They may play depending on the installed
-   Windows codecs; unsupported codecs should show an actionable message.
-3. Install a legitimate FFmpeg executable and place it on `PATH` or next to
-   Intonaco. Choose FLV, VOB, OGV, GIF and animated WebP samples. Confirm
-   conversion runs **only on selection**, then the cached MP4 plays without
-   an FFmpeg background process.
-4. Check that MP4 stream-copy remux preserves video frame size and frame rate.
-   For H.264 fallback verify approximate visual fidelity and aspect ratio.
-   A converted video is not bit-for-bit lossless if re-encoding was necessary.
-5. Select a damaged or audio-only file while a working wallpaper is playing.
-   Confirm the existing wallpaper remains or is restored and no failed
-   cache output is presented as playable.
-6. Start a large conversion, then choose another video or click Stop.
-   Confirm the FFmpeg process is cancelled and any temporary files are removed.
-7. Test a genuine 4K source and an anamorphic source. Neither should stretch;
-   the original user file must remain byte-for-byte unchanged.
-8. Confirm an absent FFmpeg installation does not affect native playback,
-   the app starts without network access and no codec runtime is bundled.
-9. Check cache pruning never deletes the current active wallpaper, and that
-   a later selection can reuse a completed cached conversion.
+1. Test H.264 MP4 natively, including the settings preview closing after
+   minimizing Intonaco to the system tray.
+2. Test H.264 and HEVC MKV, VP9 WebM, AVI, MOV, WMV, MPEG transport streams,
+   and any additional containers users request. Record which codec/Windows
+   combinations work; recognition alone is not proof of decoder support.
+3. Test an FLV, RMVB, OGV or MXF sample where native Windows lacks a suitable
+   decoder. The failure must be actionable and must not claim universal
+   native compatibility.
+4. Select a corrupt or audio-only file while a working wallpaper is already
+   playing. Verify playback fails safely and the last successfully opened
+   wallpaper is restored instead of leaving an unusable desktop.
+5. Test the supplied Satoru 3840×2160 MP4 with oversized pixel-aspect
+   metadata: verify it renders at the correct aspect ratio and its source
+   file remains byte-for-byte unchanged.
+6. Test genuine anamorphic video: it must preserve display aspect ratio and
+   not be misclassified as the malformed 4K source.
+7. Start a metadata-correction operation and choose a different wallpaper,
+   or press Stop. Confirm the latest requested wallpaper wins.
+8. Monitor CPU, RAM and GPU with the same clip while settings are visible,
+   minimized, playing and paused. No extra codec engine or helper process
+   should run. Check that idle CPU use falls when paused.
+9. Confirm drag-and-drop, file picker and recent-wallpaper list are
+   consistent, and that unsupported image animation formats are not
+   advertised as playable videos.
+10. Review packaged files: no FFmpeg executable or additional third-party
+    codec binaries should be included.
 
