@@ -72,6 +72,13 @@ if (-not $iscc) {
     throw "Inno Setup 6 (ISCC.exe) was not found. Install Inno Setup and try again."
 }
 
+# Generate both wizard images from the exact app icon on each clean build.
+# BMP works with every supported Inno Setup 6 compiler, including CI.
+& (Join-Path $PSScriptRoot "Generate-Branding.ps1")
+if ($LASTEXITCODE -ne 0) {
+    throw "Installer artwork generation failed."
+}
+
 $scriptPath = Join-Path $PSScriptRoot "Intonaco.iss"
 Write-Host "Building installer with $iscc"
 Write-Host "  Payload: $publishPath"
