@@ -109,6 +109,13 @@ namespace Intonaco.Views
                 _settings.PlaybackBackend = "Windows";
                 _settings.Save();
             }
+            if (_settings.PlaybackBackend == "NativeGPU" &&
+                !NativeVideoWallpaperPlayer.IsAvailable)
+            {
+                DebugLog.Write("Native GPU engine missing; using Windows backend.");
+                _settings.PlaybackBackend = "Windows";
+                _settings.Save();
+            }
             _player = CreatePlayer(_settings.PlaybackBackend);
             _desktop = new DesktopIntegration();
             _fullscreenDetector = new FullscreenDetector();
@@ -164,8 +171,12 @@ namespace Intonaco.Views
             Math.Max(minHeight, Math.Min(1080, workAreaHeight - 24));
 
         private static IWallpaperPlayer CreatePlayer(string backend) =>
-            AppSettings.NormalizeBackend(backend) == "MPV"
-                ? new MpvWallpaperPlayer() : new WallpaperPlayer();
+            AppSettings.NormalizeBackend(backend) switch
+            {
+                "MPV" => new MpvWallpaperPlayer(),
+                "NativeGPU" => new NativeVideoWallpaperPlayer(),
+                _ => new WallpaperPlayer()
+            };
 
         private void ApplyPlayerSettings()
         {
@@ -193,13 +204,14 @@ namespace Intonaco.Views
 
         private void UpdateBackendInterface()
         {
-            bool mpv = _player is MpvWallpaperPlayer;
-            FpsComboBox.IsEnabled = !mpv;
-            FpsComboBox.ToolTip = mpv
-                ? "MPV uses the source's native frame cadence; the Windows FPS cap does not apply."
+            bool nativeSurface = _player is MpvWallpaperPlayer
+                or NativeVideoWallpaperPlayer;
+            FpsComboBox.IsEnabled = !nativeSurface;
+            FpsComboBox.ToolTip = nativeSurface
+                ? "Hardware video playback follows the source frame rate."
                 : "Preferred presentation frame rate.";
-            PreviewHintText.Text = mpv
-                ? "MPV shows the wallpaper on the desktop without a second decoder."
+            PreviewHintText.Text = nativeSurface
+                ? "The desktop GPU renderer uses one decoder; the app shows a still preview."
                 : "Drop a video here or choose a file";
         }
 
@@ -1010,7 +1022,7 @@ namespace Intonaco.Views
             _thumbnailImage = null;
             ++_previewThumbnailVersion;
             PreviewModeButton.Content = "Play live preview";
-            PreviewModeButton.Visibility = _player is MpvWallpaperPlayer
+            PreviewModeButton.Visibility = _player is MpvWallpaperPlayer or NativeVideoWallpaperPlayer
                 ? Visibility.Collapsed : Visibility.Visible;
             RefreshPreviewForCurrentState();
         }
@@ -1042,7 +1054,7 @@ namespace Intonaco.Views
         {
             // Shell thumbnails also work when the desktop uses MPV;
             // never start an additional Windows video decoder for MPV files.
-            if (_player is MpvWallpaperPlayer)
+            if (_player is MpvWallpaperPlayer or NativeVideoWallpaperPlayer)
             {
                 _livePreviewEnabled = false;
                 PreviewModeButton.Visibility = Visibility.Collapsed;
@@ -1161,7 +1173,7 @@ namespace Intonaco.Views
 
         private void OnToggleLivePreview(object sender, RoutedEventArgs e)
         {
-            if (_previewFilePath == null || _player is MpvWallpaperPlayer)
+            if (_previewFilePath == null || _player is MpvWallpaperPlayer or NativeVideoWallpaperPlayer)
                 return;
 
             _livePreviewEnabled = !_livePreviewEnabled;
@@ -1773,6 +1785,16 @@ namespace Intonaco.Views
                 return;
             }
 
+            if (requested == "NativeGPU" && !NativeVideoWallpaperPlayer.IsAvailable)
+            {
+                _suppressEvents = true;
+                try { SelectComboByTag(BackendComboBox, _settings.PlaybackBackend); }
+                finally { _suppressEvents = false; }
+                ShowError("The native GPU DLL is missing. Reinstall the native-engine " +
+                    "test build, or choose Windows to continue.");
+                return;
+            }
+
             string? activeFile = _activeOriginalFile;
             bool wasPaused = _player.CurrentState == WallpaperPlayer.PlaybackState.Paused;
             TimeSpan position = _player.Position;
@@ -2064,7 +2086,7 @@ namespace Intonaco.Views
             if (_isExiting) return;
 
             string detail;
-            if (_player is MpvWallpaperPlayer)
+            if (_player is MpvWallpaperPlayer or NativeVideoWallpaperPlayer)
             {
                 detail = "MPV could not play this video. Verify your optional MPV " +
                     "installation and its supported codecs. Details: " + message;
