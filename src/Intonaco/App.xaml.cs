@@ -67,10 +67,17 @@ namespace Intonaco
                         return;
                     Dispatcher.BeginInvoke(() =>
                     {
-                        if (MainWindow is Views.MainWindow window && window.IsLoaded)
+                        if (MainWindow is Views.MainWindow window)
+                        {
+                            // Do not drop a desktop shortcut request just
+                            // because Loaded has not fired (startup-to-tray
+                            // may suppress that first Loaded notification).
                             window.RestoreFromSecondaryLaunch();
+                        }
                         else
+                        {
                             _pendingShowExisting = true;
+                        }
                     });
                 },
                 null, Timeout.Infinite, executeOnlyOnce: false);
