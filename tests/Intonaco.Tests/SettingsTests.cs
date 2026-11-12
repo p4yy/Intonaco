@@ -31,6 +31,36 @@ namespace Intonaco.Tests
             Assert.Equal("System", settings.Theme);
         }
 
+        [Theory]
+        [InlineData(null, "Windows")]
+        [InlineData("", "Windows")]
+        [InlineData("Invalid", "Windows")]
+        [InlineData("MPV", "MPV")]
+        [InlineData("mpv", "MPV")]
+        [InlineData("Windows", "Windows")]
+        public void PlaybackBackend_NormalizesSafely(string? input, string expected)
+        {
+            Assert.Equal(expected, AppSettings.NormalizeBackend(input));
+        }
+
+        [Fact]
+        public void PlaybackBackend_DefaultsToBundledWindowsEngine()
+        {
+            var settings = new AppSettings();
+            Assert.Equal("Windows", settings.PlaybackBackend);
+            var normalized = AppSettings.LoadFromJson(
+                "{\"playbackBackend\":\"unknown\"}");
+            Assert.Equal("Windows", normalized.PlaybackBackend);
+        }
+
+        [Fact]
+        public void PlaybackBackend_PersistsOptionalMpvChoice()
+        {
+            var settings = AppSettings.LoadFromJson(
+                "{\"playbackBackend\":\"MPV\"}");
+            Assert.Equal("MPV", settings.PlaybackBackend);
+        }
+
         [Fact]
         public void Settings_ClampVolume()
         {
@@ -176,6 +206,34 @@ namespace Intonaco.Tests
             var player = new WallpaperPlayer();
             player.Dispose();
             player.Dispose(); // Should not throw
+        }
+    }
+
+    public class MpvWallpaperPlayerTests
+    {
+        [WpfFact]
+        public void MpvBackend_IsIdleAndHasNoDecoderUntilSelected()
+        {
+            using var player = new MpvWallpaperPlayer();
+            Assert.Equal(WallpaperPlayer.PlaybackState.Stopped, player.CurrentState);
+            Assert.Null(player.CurrentFilePath);
+            Assert.Equal(TimeSpan.Zero, player.Duration);
+        }
+
+        [WpfFact]
+        public void MpvBackend_ClampsSettingsWithoutLaunchingAProcess()
+        {
+            using var player = new MpvWallpaperPlayer();
+            player.Volume = 8;
+            Assert.Equal(1.0, player.Volume);
+            player.TargetFps = 120;
+            Assert.Equal(60, player.TargetFps);
+            player.PlaybackSpeed = 100;
+            Assert.Equal(2.0, player.PlaybackSpeed);
+            player.StretchMode = System.Windows.Media.Stretch.Uniform;
+            Assert.Equal(System.Windows.Media.Stretch.Uniform, player.StretchMode);
+            player.SetMute(false);
+            Assert.False(player.IsMuted);
         }
     }
 
