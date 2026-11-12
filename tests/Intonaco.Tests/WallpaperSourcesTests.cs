@@ -9,6 +9,8 @@ namespace Intonaco.Tests
         [InlineData("https://motionbgs.com/")]
         [InlineData("https://mylivewallpapers.com/")]
         [InlineData("https://moewalls.com/")]
+        [InlineData("https://wallpaperwaifu.com/")]
+        [InlineData("https://lwp.gg/")]
         [InlineData("https://www.pexels.com/search/videos/loop/")]
         public void OfficialCopyLinks_AreApproved(string url)
             => Assert.True(WallpaperSources.IsApproved(url));
