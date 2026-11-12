@@ -1,0 +1,79 @@
+name: Native GPU Windows Setup — test build
+
+on:
+  pull_request:
+    paths:
+      - "native/**"
+      - "src/**"
+      - "tests/**"
+      - "installer/**"
+      - ".github/workflows/performance-installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    name: C++ GPU engine + tests + installer only
+    runs-on: windows-latest
+    steps:
+      - name: Check out current branch
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Compile independent native Direct3D11 renderer
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw 'Visual Studio C++ build tools unavailable.' }
+          $msbuild = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+          if (-not $msbuild) { throw 'MSBuild not found.' }
+          & $msbuild native/IntonacoVideo/IntonacoVideo.vcxproj /m /p:Platform=x64 /p:Configuration=Release
+          if ($LASTEXITCODE -ne 0) { throw "Native engine compilation failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path artifacts/native/IntonacoVideo.dll)) { throw 'Native engine DLL missing.' }
+
+      - name: Restore and compile WPF application
+        shell: pwsh
+        run: |
+          dotnet restore Intonaco.sln
+          if ($LASTEXITCODE -ne 0) { throw 'Restore failed' }
+          dotnet build Intonaco.sln -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+
+      - name: Run regression tests
+        shell: pwsh
+        run: |
+          dotnet test Intonaco.sln -c Release --no-build
+          if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed' }
+
+      - name: Publish Windows Setup payload
+        shell: pwsh
+        run: |
+          dotnet publish src/Intonaco/Intonaco.csproj -c Release -r win-x64 --self-contained true -o artifacts/installer-app /p:PublishSingleFile=false /p:PublishReadyToRun=true
+          if ($LASTEXITCODE -ne 0) { throw 'Installer app publish failed' }
+          Copy-Item artifacts/native/IntonacoVideo.dll artifacts/installer-app/IntonacoVideo.dll -Force
+          Copy-Item LICENSE, THIRD-PARTY-NOTICES.md artifacts/installer-app/
+
+      - name: Build and smoke-test one standard Setup EXE
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content src/Intonaco/Intonaco.csproj
+          $version = [string]($project.Project.PropertyGroup.Version |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -First 1)
+          $setup = & ./installer/Build-Installer.ps1 -PublishDir artifacts/installer-app -Version $version -OutputDir artifacts/installer
+          ./installer/Test-Installer.ps1 -SetupPath $setup
+          if ($LASTEXITCODE -ne 0) { throw 'Installer smoke test failed' }
+
+      - name: Upload only the normal Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Intonaco-Wallpaper-NativeGPU-Setup-TEST
+          path: artifacts/installer/Intonaco-Wallpaper-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
