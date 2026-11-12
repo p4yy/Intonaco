@@ -41,8 +41,8 @@ try {
     if ($null -eq $visual) { throw 'MSIX application has no VisualElements.' }
     $entryNames = @($zip.Entries | ForEach-Object { $_.FullName.Replace([char]92, [char]47) })
     $actual = @{
-        Name = [string]$identity.Name
-        Publisher = [string]$identity.Publisher
+        Name = [string]$identity.GetAttribute('Name')
+        Publisher = [string]$identity.GetAttribute('Publisher')
         PublisherDisplay = [string]$property.PublisherDisplayName
         ProductDisplay = [string]$property.DisplayName
         AppDisplay = [string]$visual.GetAttribute('DisplayName')
@@ -61,7 +61,7 @@ try {
         $actual.AppDisplay -cne 'Intonaco Wallpaper') {
         throw 'MSIX product display name must be Intonaco Wallpaper.'
     }
-    if ([string]$app.Executable -cne 'Intonaco.exe') {
+    if ([string]$app.GetAttribute('Executable') -cne 'Intonaco.exe') {
         throw 'MSIX application executable is not the intended desktop app.'
     }
     if ('Intonaco.exe' -cnotin $entryNames) {
