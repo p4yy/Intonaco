@@ -55,7 +55,7 @@ public:
     ULONG STDMETHODCALLTYPE Release() override {
         ULONG n = --refs_; if (!n) delete this; return n;
     }
-    HRESULT STDMETHODCALLTYPE EventNotify(DWORD event, DWORD_PTR p1, DWORD_PTR) override {
+    HRESULT STDMETHODCALLTYPE EventNotify(DWORD event, DWORD_PTR p1, DWORD) override {
         switch (event) {
         case MF_MEDIA_ENGINE_EVENT_LOADEDMETADATA:
         case MF_MEDIA_ENGINE_EVENT_CANPLAY:
@@ -185,7 +185,7 @@ private:
         ComPtr<IDXGISwapChain1> swap;
         ComPtr<IMFDXGIDeviceManager> manager;
         ComPtr<IMFMediaEngine> engine;
-        DWORD resetToken = 0;
+        UINT resetToken = 0;
         D3D_FEATURE_LEVEL level{};
         hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
             D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
