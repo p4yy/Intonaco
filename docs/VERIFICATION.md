@@ -249,3 +249,35 @@ for repeatable comparisons:
 - The WorkerW technique relies on the undocumented `0x052C` Progman message.
   It has been stable since Windows 7, but Microsoft could change it in a
   future release.
+
+
+## Format compatibility smoke test (native + optional FFmpeg)
+
+Run the following **on Windows hardware** with actual short test clips; the
+CI suite validates the application and extension routing but cannot guarantee
+which third-party codecs a Windows installation provides.
+
+1. Without `ffmpeg.exe`, verify H.264 MP4 works through the native
+   Media Foundation decoder. Check that the settings preview closes after
+   minimizing Intonaco to the tray.
+2. Try H.264 MKV and VP9 WebM natively. They may play depending on the installed
+   Windows codecs; unsupported codecs should show an actionable message.
+3. Install a legitimate FFmpeg executable and place it on `PATH` or next to
+   Intonaco. Choose FLV, VOB, OGV, GIF and animated WebP samples. Confirm
+   conversion runs **only on selection**, then the cached MP4 plays without
+   an FFmpeg background process.
+4. Check that MP4 stream-copy remux preserves video frame size and frame rate.
+   For H.264 fallback verify approximate visual fidelity and aspect ratio.
+   A converted video is not bit-for-bit lossless if re-encoding was necessary.
+5. Select a damaged or audio-only file while a working wallpaper is playing.
+   Confirm the existing wallpaper remains or is restored and no failed
+   cache output is presented as playable.
+6. Start a large conversion, then choose another video or click Stop.
+   Confirm the FFmpeg process is cancelled and any temporary files are removed.
+7. Test a genuine 4K source and an anamorphic source. Neither should stretch;
+   the original user file must remain byte-for-byte unchanged.
+8. Confirm an absent FFmpeg installation does not affect native playback,
+   the app starts without network access and no codec runtime is bundled.
+9. Check cache pruning never deletes the current active wallpaper, and that
+   a later selection can reuse a completed cached conversion.
+
