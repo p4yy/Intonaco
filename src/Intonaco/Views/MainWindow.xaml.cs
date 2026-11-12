@@ -1050,6 +1050,9 @@ namespace Intonaco.Views
                     PreviewMedia.Play();
                     _previewPlayRequested = true;
                 }
+                // Load the native surface behind the opaque placeholder.
+                // Show the actual frame only after MediaOpened succeeds.
+                PreviewMedia.Visibility = Visibility.Visible;
 
                 if (_previewOpened)
                 {
@@ -1114,6 +1117,7 @@ namespace Intonaco.Views
                 PreviewMedia.Play();
                 _previewPlayRequested = true;
                 ShowPreviewMessage("Preparing paused preview…");
+                PreviewMedia.Visibility = Visibility.Visible;
             }
             catch (Exception ex)
             {
@@ -1163,6 +1167,12 @@ namespace Intonaco.Views
 
         private void OnPreviewMediaOpened(object sender, RoutedEventArgs e)
         {
+            if (_isExiting || !IsPreviewWindowVisible ||
+                _previewFailedPath != null || !IsLivePreviewEnabled)
+            {
+                ReleasePreviewPipeline();
+                return;
+            }
             // MediaOpened fires before the first frame; do not show a blank
             // surface if Windows reports no decoded video track.
             if (_previewFilePath == null ||
