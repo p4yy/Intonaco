@@ -110,7 +110,7 @@
                             <Border Background="{DynamicResource PreviewBackgroundBrush}"
                                     CornerRadius="12,12,0,0" />
 
-                            <StackPanel x:Name="PreviewPlaceholder"
+                            <StackPanel x:Name="PreviewPlaceholder" Panel.ZIndex="2"
                                         VerticalAlignment="Center"
                                         HorizontalAlignment="Center"
                                         Margin="24">
@@ -139,13 +139,27 @@
                                           Visibility="Collapsed"
                                           IsHitTestVisible="False"
                                           MediaOpened="OnPreviewMediaOpened"
-                                          MediaEnded="OnPreviewMediaEnded" />
+                                          MediaEnded="OnPreviewMediaEnded"
+                                          MediaFailed="OnPreviewMediaFailed" />
 
                             <Image x:Name="PreviewImage"
                                    Stretch="UniformToFill"
                                    RenderOptions.BitmapScalingMode="HighQuality"
                                    Visibility="Collapsed"
                                    IsHitTestVisible="False" />
+
+                            <!-- Decode preview on demand, especially for 4K sources. -->
+                            <Button x:Name="PreviewToggleButton"
+                                    Panel.ZIndex="4"
+                                    Visibility="Collapsed"
+                                    Content="Show preview"
+                                    Style="{StaticResource GhostButton}"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top"
+                                    Margin="0,12,12,0"
+                                    MinWidth="105" Height="30"
+                                    Click="OnToggleLivePreview"
+                                    ToolTip="Turn the separate in-app video preview on or off" />
 
                             <Border HorizontalAlignment="Right"
                                     VerticalAlignment="Bottom"
