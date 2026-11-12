@@ -112,6 +112,12 @@ Resource use depends on codec, resolution, GPU, monitor configuration and Window
 
 **Paused video stays open by design.** The original MediaElement retains its native frame to prevent black borders and flicker. A full garbage collection cannot release that native decoder, so the app avoids a blocking collection on pause.
 
+## Microsoft Store
+
+The GitHub installer and portable EXE are Windows download builds. Microsoft
+Store publication needs a signed EXE/MSI installer or a separately packaged MSIX,
+plus real-device QA. See the [Store submission checklist](docs/MICROSOFT_STORE.md).
+
 ## Project
 
 [Source](src/Intonaco) · [Tests](tests/Intonaco.Tests) · [Changelog](CHANGELOG.md) · [Brand](docs/branding) · [Demo](docs/demo) · [Issues](https://github.com/p4yy/Intonaco/issues)
