@@ -28,7 +28,11 @@ namespace Intonaco
                 // Forward shortcut launches to the existing UI, even when
                 // that window is hidden in the tray. Silent startup never
                 // interrupts an existing instance.
-                if (!Core.StartupManager.ShouldStartMinimized(e.Args))
+                bool isAutomaticStartup = Core.StartupManager.ShouldStartMinimized(e.Args);
+#if INTONACO_STORE
+                isAutomaticStartup |= Core.StoreStartupManager.IsStartupActivation();
+#endif
+                if (!isAutomaticStartup)
                 {
                     try
                     {
