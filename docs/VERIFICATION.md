@@ -92,6 +92,26 @@ are never silently skipped. If you run any of them, please report results
 - [ ] Open location reveals the current video in File Explorer, and Open logs
       opens `%LocalAppData%\Intonaco`
 
+### v2.1.0 responsive layout and background resources
+
+- [ ] At 620px, 900px, 1200px and maximized widths, the central content stays
+      aligned and the video preview maintains a roughly 16:9 frame instead of
+      becoming an ultra-wide strip; labels, sliders and actions remain readable.
+- [ ] Test 100%, 125%, 150% and mixed-monitor display scaling; changing monitors
+      never clips buttons, truncates essential labels or cuts off the settings.
+- [ ] While the app is focused, the native preview animates in sync with the
+      wallpaper; while minimized or another application is activated, Intonaco
+      releases the separate preview decoder, but the actual wallpaper obeys
+      the selected pause/continue background policy.
+- [ ] Reactivate the app and verify preview position, mute, seek, play/pause,
+      speed, looping and Fit/Fill controls still work after decoder recreation.
+- [ ] Compare RAM, CPU and GPU when the control window is active versus when
+      another app is active (while background playback continues). Do not
+      claim a specific saving until measured on real Windows hardware.
+- [ ] Explorer restarts recover the wallpaper automatically despite the lower
+      placement polling frequency; verify foreground focus and fullscreen
+      pausing still respond normally.
+
 ### Power / shell events
 
 - [ ] Lock (Win+L) pauses; unlock resumes
