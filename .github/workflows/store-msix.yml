@@ -1,6 +1,11 @@
 name: Store MSIX
 
 on:
+  push:
+    branches: ['main']
+    paths:
+      - 'store/**'
+      - '.github/workflows/store-msix.yml'
   pull_request:
     paths:
       - 'src/**'
@@ -54,18 +59,23 @@ jobs:
             if (-not [string]::IsNullOrWhiteSpace($value)) { $count++ }
           }
           if ($count -notin @(0, 3)) {
-            throw 'Provide all three exact Partner Center identity fields or leave all blank for a preview.'
+            throw 'Provide all three identity overrides or leave all blank to use the saved Partner Center identity.'
           }
+          # Partner Center package identity is public metadata, not a secret.
+          # Keep it in one reviewed source file rather than a fake preview DN.
+          $registered = Get-Content -LiteralPath store/partner-center-identity.json -Raw |
+            ConvertFrom-Json
           if ($count -eq 0) {
-            $identity = 'IntonacoWallpaper.DevelopmentPreview'
-            $publisher = 'CN=IntonacoWallpaperDevelopmentPreview'
-            $display = 'Acev Dev Co'
-            Write-Warning 'PREVIEW IDENTITY ONLY. Do not upload this artifact to Partner Center.'
+            $identity = [string]$registered.package_identity_name
+            $publisher = [string]$registered.publisher_distinguished_name
+            $display = [string]$registered.publisher_display_name
           } else {
             $identity = $env:STORE_ID
             $publisher = $env:STORE_PUBLISHER
             $display = $env:STORE_DISPLAY_PUBLISHER
           }
+          Write-Host "Packaging Store identity: $identity (publisher: $display)"
+          Write-Host 'This CI artifact is UNSIGNED and NOT automatically submitted to Partner Center.'
           [xml]$project = Get-Content -LiteralPath src/Intonaco/Intonaco.csproj
           $version = [string]($project.Project.PropertyGroup.Version |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
@@ -78,10 +88,24 @@ jobs:
             -PublisherDisplayName $display `
             -Version "$version.0" `
             -OutputPath $output
-      - name: Upload unsigned MSIX artifact
+      - name: Verify real Partner Center identity and create Store upload
+        shell: pwsh
+        run: |
+          $identity = Get-Content -LiteralPath store/partner-center-identity.json -Raw |
+            ConvertFrom-Json
+          $package = Get-ChildItem artifacts/store -Filter '*.msix' -File |
+            Select-Object -First 1
+          if (-not $package) { throw 'Store MSIX package was not created.' }
+          ./store/Make-StoreUpload.ps1 `
+            -MsixPath $package.FullName `
+            -ExpectedIdentityName $identity.package_identity_name `
+            -ExpectedPublisherDn $identity.publisher_distinguished_name `
+            -ExpectedPublisherDisplayName $identity.publisher_display_name
+
+      - name: Upload Partner Center submission file (unsigned)
         uses: actions/upload-artifact@v4
         with:
-          name: Intonaco-Wallpaper-MSIX-unsigned
-          path: artifacts/store/*.msix
+          name: Intonaco-Wallpaper-PartnerCenter-StoreUpload
+          path: artifacts/store/*.msixupload
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30

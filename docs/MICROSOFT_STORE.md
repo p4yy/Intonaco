@@ -12,16 +12,19 @@ Microsoft Store certification.
 - Create a Windows Application Packaging Project or an MSIX package with the
   Microsoft MSIX Packaging Tool.
 - Use the app identity, publisher and reserved display name supplied in Partner
-  Center. Do not invent a production package identity.
+  Center. The confirmed public values are recorded in `store/partner-center-identity.json`.
 - Validate the package with the Windows App Certification Kit and perform
   installation/upgrade/uninstall testing.
 - The Microsoft Store re-signs submitted MSIX/AppX packages, so no separately
   purchased CA certificate is required **for Store distribution**.
-- A separate Store MSIX workflow now produces an unsigned **development
-  preview** package. For an actual Store submission, rebuild with the exact
-  Partner Center Package Identity Name, Publisher distinguished name and
-  registered publisher display name. Development-preview identities are
-  **not suitable for submission**.
+- The separate **Store MSIX** workflow produces an **unsigned** MSIX with the
+  recorded real Partner Center identity by default. That establishes correct
+  naming and publisher manifest fields, not certification or installation trust.
+  Check the artifact and validate with Windows App Certification Kit before
+  uploading in Partner Center.
+- The Partner Center display name is **Acev Apps Co.**, whereas the GitHub
+  Inno Setup installer has independently configured `Acev Dev Co` metadata.
+  Never substitute the installer company text for the registered Store publisher.
 
 ### Alternative: existing Inno Setup EXE installer
 
