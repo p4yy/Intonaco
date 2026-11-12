@@ -17,7 +17,7 @@
   #define OutputDir "..\release"
 #endif
 
-#define MyAppName "Intonaco"
+#define MyAppName "Intonaco Wallpaper"
 #define MyAppPublisher "Acev Dev Co"
 #define MyAppURL "https://github.com/p4yy/Intonaco"
 #define MyAppExeName "Intonaco.exe"
@@ -33,16 +33,17 @@ AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
 VersionInfoVersion={#MyAppVersion}.0
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription=Intonaco live wallpaper for Windows
+VersionInfoDescription=Intonaco Wallpaper - live video wallpapers for Windows
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={autopf}\Intonaco
+; Keep the original install folder and AppId so upgrades preserve files and preferences.
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 AllowNoIcons=no
 LicenseFile=..\LICENSE
 OutputDir={#OutputDir}
-OutputBaseFilename=Intonaco-v{#MyAppVersion}-win-x64-setup
+OutputBaseFilename=Intonaco-Wallpaper-v{#MyAppVersion}-win-x64-setup
 SetupIconFile=..\src\Intonaco\Assets\intonaco.ico
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
@@ -72,13 +73,18 @@ SetupLogging=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-WelcomeLabel2=Bring your Windows desktop to life with local video wallpapers.%n%nIntonaco installs without a separate .NET download. Existing wallpapers and preferences are preserved when updating.
+WelcomeLabel2=Bring your Windows desktop to life with local video wallpapers.%n%nIntonaco Wallpaper installs without a separate .NET download. Existing wallpapers and preferences are preserved when updating.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+; Remove only shortcuts belonging to the old display name during upgrades.
+Type: files; Name: "{autoprograms}\Intonaco.lnk"
+Type: files; Name: "{autodesktop}\Intonaco.lnk"
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Comment: "Lightweight live wallpaper for Windows"
