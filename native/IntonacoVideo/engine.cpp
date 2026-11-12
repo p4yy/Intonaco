@@ -143,6 +143,7 @@ public:
     void open(const wchar_t* path) {
         std::lock_guard<std::mutex> lock(commandMutex_);
         pendingFile_ = path ? path : L"";
+        requestedPause_ = false;
         requestedOpen_ = true;
         pendingStop_ = false;
         state_->ready = false;
@@ -219,7 +220,8 @@ private:
 
         ComPtr<IMFAttributes> attributes;
         ComPtr<IMFMediaEngineClassFactory> mediaFactory;
-        ComPtr<IMFMediaEngineNotify> notify = new MediaEvents(state_);
+        ComPtr<IMFMediaEngineNotify> notify;
+        notify.Attach(new MediaEvents(state_));
         if (SUCCEEDED(hr)) hr = MFCreateAttributes(attributes.GetAddressOf(), 4);
         if (SUCCEEDED(hr)) hr = attributes->SetUnknown(MF_MEDIA_ENGINE_DXGI_MANAGER, manager.Get());
         if (SUCCEEDED(hr)) hr = attributes->SetUnknown(MF_MEDIA_ENGINE_CALLBACK, notify.Get());
@@ -264,6 +266,7 @@ private:
                 hasSource = false; playing = false;
                 state_->ready = false;
                 state_->ended = false;
+                state_->error = 0;
                 state_->durationMs = 0; state_->positionMs = 0;
                 state_->videoWidth = 0; state_->videoHeight = 0;
                 state_->state = kStopped;
@@ -276,6 +279,13 @@ private:
                     hasSource = true;
                     state_->state = kStarting;
                 } else fail(openHr);
+            }
+            if (hasSource && state_->error.load() != 0) {
+                engine->Pause();
+                engine->SetSource(nullptr);
+                hasSource = false;
+                playing = false;
+                state_->state = kFailed;
             }
             if (hasSource) {
                 if (settingsDirty) {
