@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -47,6 +48,14 @@ namespace Intonaco.Core
                 NativeMediaEngine.Container.MpegProgram => ".mpeg",
                 _ => string.Empty
             };
+
+            // Some MLW files advertise the MLW.VIDEO header followed by
+            // ordinary MP4 data. Only unwrap when a real ISO-BMFF ftyp
+            // header can be verified; never guess that encrypted data is MP4.
+            long embeddedMp4Offset = extension.Length == 0
+                ? FindEmbeddedMp4Offset(original) : -1;
+            if (embeddedMp4Offset >= 0)
+                extension = ".mp4";
 
             bool zipWrapped = extension.Length == 0 && IsZipHeader(original);
             if (extension.Length == 0 && !zipWrapped)
@@ -97,7 +106,9 @@ namespace Intonaco.Core
                 }
 
                 string dest = Path.Combine(root, key + extension);
-                long expected = entry?.Length ?? info.Length;
+                long expected = entry?.Length ??
+                    (embeddedMp4Offset >= 0
+                        ? info.Length - embeddedMp4Offset : info.Length);
                 if (File.Exists(dest) && new FileInfo(dest).Length == expected)
                     return dest;
 
@@ -120,6 +131,8 @@ namespace Intonaco.Core
                             await using var source = new FileStream(original,
                                 FileMode.Open, FileAccess.Read, FileShare.Read,
                                 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                            if (embeddedMp4Offset >= 0)
+                                source.Position = embeddedMp4Offset;
                             await source.CopyToAsync(target, 81920, cancel)
                                 .ConfigureAwait(false);
                         }
@@ -159,6 +172,35 @@ namespace Intonaco.Core
                    ext.Equals(".mov", StringComparison.OrdinalIgnoreCase) ||
                    ext.Equals(".avi", StringComparison.OrdinalIgnoreCase) ||
                    ext.Equals(".wmv", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Conservative compatibility for a known MLW.VIDEO header:
+        /// copy only if the following payload has a valid ISO BMFF
+        /// ftyp box. This does not decrypt or reverse protected media.
+        /// </summary>
+        internal static long FindEmbeddedMp4Offset(string path)
+        {
+            Span<byte> prefix = stackalloc byte[8192];
+            using var file = new FileStream(path, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite, 8192, FileOptions.SequentialScan);
+            int count = file.Read(prefix);
+            if (count < 25 ||
+                !prefix[..9].SequenceEqual("MLW.VIDEO"u8))
+                return -1;
+
+            for (int i = 9; i <= count - 16; i++)
+            {
+                if (!prefix.Slice(i + 4, 4).SequenceEqual("ftyp"u8))
+                    continue;
+
+                uint length = BinaryPrimitives.ReadUInt32BigEndian(
+                    prefix.Slice(i, 4));
+                if (length >= 16 && length <= 4096 &&
+                    (long)length <= file.Length - i)
+                    return i;
+            }
+            return -1;
         }
 
         private static bool IsZipHeader(string path)
