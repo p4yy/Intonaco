@@ -39,7 +39,7 @@ try {
     $app = $manifest.Package.Applications.Application
     $visual = @($app.ChildNodes | Where-Object { $_.LocalName -eq 'VisualElements' }) | Select-Object -First 1
     if ($null -eq $visual) { throw 'MSIX application has no VisualElements.' }
-    $entryNames = @($zip.Entries | ForEach-Object { $_.FullName.Replace('\\', '/') })
+    $entryNames = @($zip.Entries | ForEach-Object { $_.FullName.Replace([char]92, [char]47) })
     $actual = @{
         Name = [string]$identity.Name
         Publisher = [string]$identity.Publisher
