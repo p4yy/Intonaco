@@ -59,10 +59,10 @@
     <FontFamily x:Key="DefaultFont">Segoe UI Variable Text, Segoe UI Variable, Segoe UI, sans-serif</FontFamily>
     <FontFamily x:Key="HeadingFont">Segoe UI Variable Display, Segoe UI Variable, Segoe UI, sans-serif</FontFamily>
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
-    <sys:Double x:Key="FontSizeCaption">12</sys:Double>
-    <sys:Double x:Key="FontSizeBody">14</sys:Double>
-    <sys:Double x:Key="FontSizeSubtitle">16</sys:Double>
-    <sys:Double x:Key="FontSizeTitle">20</sys:Double>
+    <sys:Double x:Key="FontSizeCaption">13</sys:Double>
+    <sys:Double x:Key="FontSizeBody">15</sys:Double>
+    <sys:Double x:Key="FontSizeSubtitle">17</sys:Double>
+    <sys:Double x:Key="FontSizeTitle">22</sys:Double>
 
     <!-- Shared radii keep controls and surfaces consistent. -->
     <CornerRadius x:Key="ControlCornerRadius">7</CornerRadius>
