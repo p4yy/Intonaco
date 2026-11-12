@@ -18,6 +18,11 @@ namespace Intonaco
         private const string ShowExistingEventName = @"Local\Intonaco_ShowMainWindow";
         private bool _ownsMutex;
         private bool _pendingShowExisting;
+        private string? _sessionMarkerPath;
+
+        // A leftover marker means the previous process did not exit through
+        // OnExit (crash, forced termination, OS reset). Defer auto-play once.
+        internal bool LastSessionEndedUnexpectedly { get; private set; }
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -118,6 +123,18 @@ namespace Intonaco
                 "Intonaco");
             Directory.CreateDirectory(settingsDir);
 
+            try
+            {
+                string markerPath = Path.Combine(settingsDir, "session.active");
+                LastSessionEndedUnexpectedly = File.Exists(markerPath);
+                File.WriteAllText(markerPath, $"{Environment.ProcessId} {DateTime.UtcNow:O}");
+                _sessionMarkerPath = markerPath;
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Could not initialize safe-start marker: " + ex.Message);
+            }
+
             DispatcherUnhandledException += OnDispatcherUnhandledException;
 
             // Apply the persisted theme (System / Light / Dark) before the
@@ -134,6 +151,12 @@ namespace Intonaco
 
         protected override void OnExit(ExitEventArgs e)
         {
+            if (_sessionMarkerPath != null)
+            {
+                try { File.Delete(_sessionMarkerPath); }
+                catch (Exception ex) { DebugLog.Write("Could not clear session marker: " + ex.Message); }
+            }
+
             try { SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged; }
             catch { /* Non-critical. */ }
 
