@@ -123,7 +123,7 @@ namespace Intonaco.Views
             // Footer version comes from the assembly, so it can never drift
             // from the released build number.
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            VersionText.Text = version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "";
+            VersionText.Text = string.Empty; // Version stays in file metadata for servicing.
 
             LoadSettings();
             WireEvents();
