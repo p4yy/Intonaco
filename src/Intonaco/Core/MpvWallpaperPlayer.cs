@@ -363,7 +363,7 @@ namespace Intonaco.Core
             {
                 if (!cancel.IsCancellationRequested)
                 {
-                    _dispatcher.BeginInvoke(() =>
+                    _ = _dispatcher.BeginInvoke(() =>
                     {
                         if (!cancel.IsCancellationRequested)
                             ReportError("MPV communication failed: " + ex.Message);
