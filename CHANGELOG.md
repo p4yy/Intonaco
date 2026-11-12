@@ -4,6 +4,35 @@ All notable changes to Intonaco are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.3] — Unreleased
+
+**Stability first.** This build is a testing candidate and has not been
+verified on all Windows hardware.
+
+### Performance and preview
+- The app defaults to a still video thumbnail, extracted off the WPF UI
+  thread, instead of continuously running an extra video decoder alongside
+  the live desktop wallpaper. **Play live preview** is an explicit option.
+- Optional animated preview decoder failure returns to the still thumbnail.
+  Switching focus or minimizing the app frees the extra video decoder.
+- The still preview remains available with the MPV backend. If Windows
+  cannot generate a video thumbnail, a clear placeholder is shown instead
+  of a large black preview.
+
+### File compatibility
+- Recognize .mlw in file dialogs and drag/drop.
+- Import MLW files that contain an ordinary playable video stream or
+  a ZIP package with a compatible video; cache a separate playable copy.
+  Never modify the downloaded original or execute bundled content.
+- Protected/proprietary MLW files remain unsupported until their actual
+  format can be independently validated. Such files show a specific error,
+  not a false claim of playback support.
+
+### Verification still required
+- Physical Windows testing with real 1080p/4K videos and several authentic
+  MLW files, including proprietary variants.
+- Performance measurements and regression testing before any release.
+
 ## [2.1.2] — 2026-11-12
 
 A consistent Intonaco Wallpaper identity, cleaner discovery and more reliable desktop shortcut activation.

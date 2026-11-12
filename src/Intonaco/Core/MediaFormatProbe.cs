@@ -24,7 +24,7 @@ namespace Intonaco.Core
         // that every stream inside the container can be decoded.
         private static readonly string[] VideoExtensions =
         {
-            ".mp4", ".m4v", ".mp4v", ".mov", ".qt",
+            ".mlw", ".mp4", ".m4v", ".mp4v", ".mov", ".qt",
             ".mkv", ".webm", ".avi", ".wmv", ".asf",
             ".mpg", ".mpeg", ".m2ts", ".mts", ".m2t", ".ts",
             ".3gp", ".3g2", ".3gpp", ".vob",
@@ -39,12 +39,12 @@ namespace Intonaco.Core
         private static readonly HashSet<string> UncommonContainers =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                ".flv", ".f4v", ".ogv", ".ogg", ".divx", ".rm", ".rmvb",
+                ".mlw", ".flv", ".f4v", ".ogv", ".ogg", ".divx", ".rm", ".rmvb",
                 ".amv", ".nsv", ".mxf", ".dv", ".nut", ".y4m", ".dat"
             };
 
         public static string FileDialogFilter =>
-            "Video files|" +
+            "Live wallpaper and video files|" +
             string.Join(";", Array.ConvertAll(VideoExtensions, ext => "*" + ext)) +
             "|All files|*.*";
 

@@ -139,13 +139,30 @@
                                           Visibility="Collapsed"
                                           IsHitTestVisible="False"
                                           MediaOpened="OnPreviewMediaOpened"
-                                          MediaEnded="OnPreviewMediaEnded" />
+                                          MediaEnded="OnPreviewMediaEnded"
+                                          MediaFailed="OnPreviewMediaFailed" />
 
                             <Image x:Name="PreviewImage"
                                    Stretch="UniformToFill"
                                    RenderOptions.BitmapScalingMode="HighQuality"
                                    Visibility="Collapsed"
                                    IsHitTestVisible="False" />
+
+                            <!-- Default is a still thumbnail, avoiding an extra
+                                 hardware decoder. Live preview is an explicit choice. -->
+                            <Button x:Name="PreviewModeButton"
+                                    Content="Play live preview"
+                                    Click="OnToggleLivePreview"
+                                    Style="{StaticResource GhostButton}"
+                                    Visibility="Collapsed"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top"
+                                    Margin="10"
+                                    MinWidth="122"
+                                    Height="30"
+                                    Padding="10,2"
+                                    Panel.ZIndex="5"
+                                    ToolTip="Enable an optional second video decoder for motion preview" />
 
                             <Border HorizontalAlignment="Right"
                                     VerticalAlignment="Bottom"
