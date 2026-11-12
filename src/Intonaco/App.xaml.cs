@@ -15,6 +15,16 @@ namespace Intonaco
         private RegisteredWaitHandle? _showExistingWait;
         private const string ShowExistingEventName = @"Local\Intonaco_ShowMainWindow";
         private bool _ownsMutex;
+        private bool _pendingShowExisting;
+
+        // Called on the UI dispatcher by MainWindow.Loaded. A second
+        // instance can signal before StartupUri creates the window.
+        internal bool ConsumePendingShowRequest()
+        {
+            bool pending = _pendingShowExisting;
+            _pendingShowExisting = false;
+            return pending;
+        }
         private ResourceDictionary? _lightThemeDictionary;
         private string _themePreference = "System";
         private const string MutexName = "Intonaco_SingleInstance_Mutex";
@@ -57,8 +67,10 @@ namespace Intonaco
                         return;
                     Dispatcher.BeginInvoke(() =>
                     {
-                        if (MainWindow is Views.MainWindow window)
+                        if (MainWindow is Views.MainWindow window && window.IsLoaded)
                             window.RestoreFromSecondaryLaunch();
+                        else
+                            _pendingShowExisting = true;
                     });
                 },
                 null, Timeout.Infinite, executeOnlyOnce: false);
