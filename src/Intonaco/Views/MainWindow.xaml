@@ -4,7 +4,7 @@
         xmlns:tb="http://www.hardcodet.net/taskbar"
         Title="Intonaco"
         Icon="/Assets/intonaco.ico"
-        Width="900" Height="780"
+        Width="620" Height="1080"
         MinWidth="620" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBackgroundBrush}"
