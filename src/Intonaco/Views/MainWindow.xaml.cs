@@ -361,8 +361,17 @@ namespace Intonaco.Views
 
             bool restore = _pendingWindowRestore;
             _pendingWindowRestore = false;
-            bool silent = _startMinimized && !restore;
+            bool recovering = Application.Current is App
+                { LastSessionEndedUnexpectedly: true };
+            bool silent = _startMinimized && !restore && !recovering;
             _startMinimized = false;
+            if (recovering)
+            {
+                // Show controls rather than silently re-creating the wallpaper
+                // after a crashed/killed process or machine freeze.
+                ShowInTaskbar = true;
+                DebugLog.Write("Unclean previous session: entering safe startup.");
+            }
 
             // A fully constructed and first-painted WPF window is safe to
             // hide and restore. SourceInitialized is too early.
@@ -384,6 +393,13 @@ namespace Intonaco.Views
 
         private void ScheduleStartupWallpaperAfterPaint()
         {
+            if (Application.Current is App { LastSessionEndedUnexpectedly: true })
+            {
+                DebugLog.Write("Safe startup: last wallpaper is NOT auto-played. User may select it manually.");
+                StatusText.Text = "Safe startup — automatic wallpaper playback skipped";
+                return;
+            }
+
             if (_startupWallpaperScheduled || !_settings.AutoPlay ||
                 string.IsNullOrWhiteSpace(_settings.LastWallpaperPath))
                 return;
@@ -789,6 +805,10 @@ namespace Intonaco.Views
             {
                 prepared = await NativeMediaEngine.PrepareAsync(
                     filePath, operation.Token);
+                // Shell window discovery and 0x052C requests can take seconds
+                // on an overloaded Explorer. Never run them on the WPF UI
+                // thread, and cancel older requests when users switch files.
+                await _desktop.PrepareDesktopLayerAsync(operation.Token);
             }
             catch (OperationCanceledException)
             {
