@@ -6,6 +6,19 @@ namespace Intonaco.Tests
     public class StartupRestoreTests
     {
         [Theory]
+        [InlineData(1137, 1080)]
+        [InlineData(1100, 1076)]
+        [InlineData(900, 876)]
+        [InlineData(700, 676)]
+        [InlineData(600, 620)]
+        public void CompactDefaultWindow_RespectsScreenWorkArea(
+            double availableHeight, double expectedHeight)
+        {
+            Assert.Equal(expectedHeight, Intonaco.Views.MainWindow.CalculateInitialWindowHeight(
+                availableHeight, 620));
+        }
+
+        [Theory]
         [InlineData(false, "\"C:\\Program Files\\Intonaco\\Intonaco.exe\"")]
         [InlineData(true, "\"C:\\Program Files\\Intonaco\\Intonaco.exe\" --minimized")]
         public void StartupCommand_RespectsSeparateSignInPreference(
