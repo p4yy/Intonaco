@@ -117,28 +117,23 @@ jobs:
           Copy-Item LICENSE, THIRD-PARTY-NOTICES.md publish/framework-dependent/
           Copy-Item LICENSE, THIRD-PARTY-NOTICES.md publish/self-contained/
 
-          $fd = "release/Intonaco-v$version-win-x64-framework-dependent.zip"
-          $sc = "release/Intonaco-v$version-win-x64-self-contained.zip"
+          $fd = "release/Intonaco-Wallpaper-v$version-win-x64-framework-dependent.zip"
+          $sc = "release/Intonaco-Wallpaper-v$version-win-x64-self-contained.zip"
           Compress-Archive -Path publish/framework-dependent/* -DestinationPath $fd
           Compress-Archive -Path publish/self-contained/* -DestinationPath $sc
 
           # Direct portable .exe download (the self-contained single file,
           # no unzip needed). The recommended installer was built and smoke
           # tested into this same release folder by the previous step.
-          $exe = "release/Intonaco-v$version-win-x64.exe"
+          $exe = "release/Intonaco-Wallpaper-v$version-win-x64.exe"
           Copy-Item publish/self-contained/Intonaco.exe $exe
-          $setup = "release/Intonaco-v$version-win-x64-setup.exe"
+          $setup = "release/Intonaco-Wallpaper-v$version-win-x64-setup.exe"
           if (-not (Test-Path -LiteralPath $setup)) {
             throw "Installer was not found at $setup"
           }
 
-          # Also produce plan-named aliases: Intonaco-vX-Portable.exe and Setup.exe
-          $portableAlias = "release/Intonaco-v$version-Portable.exe"
-          Copy-Item $exe $portableAlias
-          $setupAlias = "release/Intonaco-v$version-Setup.exe"
-          Copy-Item $setup $setupAlias
-
-          $lines = foreach ($file in @($setup, $fd, $sc, $exe, $portableAlias, $setupAlias)) {
+          # One installer and one portable EXE; no duplicate aliases.
+          $lines = foreach ($file in @($setup, $fd, $sc, $exe)) {
             $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $(Split-Path $file -Leaf)"
           }
@@ -149,13 +144,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Intonaco ${{ steps.version.outputs.tag }}
+          name: Intonaco Wallpaper ${{ steps.version.outputs.tag }}
           generate_release_notes: false
           target_commitish: ${{ github.sha }}
           body: |
-            ## Intonaco v${{ steps.version.outputs.version }}
+            ## Intonaco Wallpaper v${{ steps.version.outputs.version }}
 
-            Discover live wallpaper sources without leaving Intonaco, and reliably restore from desktop shortcuts.
+            Discover live wallpaper sources from Intonaco Wallpaper, and reliably restore from desktop shortcuts.
 
             ### Highlights
             - New, compact **Get live wallpapers** section with copyable addresses for six trusted third-party catalogs.
@@ -166,13 +161,12 @@ jobs:
             - No new background network activity or playback overhead.
 
             ### Download
-            - `Intonaco-v${{ steps.version.outputs.version }}-win-x64-setup.exe` — Windows installer.
-            - `Intonaco-v${{ steps.version.outputs.version }}-win-x64.exe` — portable standalone EXE.
-            - `Intonaco-v${{ steps.version.outputs.version }}-win-x64-self-contained.zip` — portable archive.
-            - `Intonaco-v${{ steps.version.outputs.version }}-win-x64-framework-dependent.zip` — requires .NET 8 Desktop Runtime.
+            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64-setup.exe` — Windows installer.
+            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64.exe` — portable standalone EXE.
+            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64-self-contained.zip` — portable archive.
+            - `Intonaco-Wallpaper-v${{ steps.version.outputs.version }}-win-x64-framework-dependent.zip` — requires .NET 8 Desktop Runtime.
 
             The installer and portable EXE do not require a separate .NET installation.
-            Additional `-Setup.exe` and `-Portable.exe` aliases are included.
             Check `SHA256SUMS.txt` to verify downloads.
 
             **Hardware testing:** Windows CI covers compilation, tests and installer smoke
