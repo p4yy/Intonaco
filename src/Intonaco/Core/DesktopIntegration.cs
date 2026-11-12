@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
 
@@ -545,6 +546,26 @@ namespace Intonaco.Core
         }
 
         #endregion
+
+        /// <summary>
+        /// Explorer's 0x052C split can take several seconds after login.
+        /// Run pure shell-window discovery and WorkerW preparation on a
+        /// background thread, so the WPF control window remains responsive.
+        /// Only Attach(Window) touches the actual WPF wallpaper surface.
+        /// </summary>
+        public Task PrepareDesktopLayerAsync(CancellationToken cancellationToken)
+        {
+            return Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_disposed)
+                    return;
+
+                DesktopSnapshot snapshot = CaptureDesktopState();
+                if (snapshot.Progman != IntPtr.Zero)
+                    EnsureDesktopSplit(snapshot);
+            }, cancellationToken);
+        }
 
         #region Attach
 
