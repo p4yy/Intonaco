@@ -78,6 +78,9 @@ namespace Intonaco.Views
         private bool _suppressEvents = true;
         private bool _isExiting;
         private bool _startMinimized;
+        private bool _firstContentRendered;
+        private bool _pendingWindowRestore;
+        private bool _startupWallpaperScheduled;
 
         // Explorer restart detection
         private uint _shellRestartMessage;
@@ -127,14 +130,10 @@ namespace Intonaco.Views
             InitializeSystemTray();
             UpdateBackendInterface();
 
-            // Handle silent boot: --minimized / -m / StartMinimized setting.
-            // StartupUri calls Show() after this constructor returns, so hiding
-            // here alone would still flash the window. Suppress activation now
-            // and hide at SourceInitialized, which fires while the HWND is
-            // being created and before the window is ever presented.
-            // A manual click on the app must always open its controls. The
-            // saved startup preference is honoured by StartupManager when
-            // Windows launches the app at sign-in, not on every manual launch.
+            // A manual launch must always open the controls. Automatic startup
+            // with --minimized initializes the WPF surface before hiding it;
+            // hiding at SourceInitialized left an unpainted black client area
+            // after a later desktop-shortcut launch.
             _startMinimized = StartupManager.ShouldStartMinimized();
 #if INTONACO_STORE
             _startMinimized |= StoreStartupManager.IsStartupActivation() &&
@@ -144,32 +143,16 @@ namespace Intonaco.Views
             {
                 ShowActivated = false;
                 ShowInTaskbar = false;
-                // Never put the hidden window into a minimized WPF state.
-                // WPF can otherwise re-show the minimized HWND before it is
-                // restored and leave the controls unpainted / black.
-                SourceInitialized += OnStartMinimizedSourceInitialized;
-                DebugLog.Write(
-                    "Start minimized: launching silently in the system tray " +
-                    $"(StartMinimized={_settings.StartMinimized}, " +
-                    $"flag={StartupManager.ShouldStartMinimized()}).");
+                // Keep the first HWND invisible until WPF has completed its
+                // first render; no black title-bar window during sign-in.
+                Opacity = 0;
+                DebugLog.Write("Automatic minimized launch: awaiting first WPF render.");
             }
 
-            // Auto-play last wallpaper — persisted path + settings restore.
-            // This covers Resume last wallpaper toggle; the config file
-            // stores LastWallpaperPath, volume, fit, fps, etc.
-            if (_settings.AutoPlay && !string.IsNullOrEmpty(_settings.LastWallpaperPath) &&
-                File.Exists(_settings.LastWallpaperPath))
-            {
-                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
-                {
-                    DebugLog.Write($"AutoPlay restoring: {_settings.LastWallpaperPath}");
-                    ApplyWallpaper(_settings.LastWallpaperPath);
-                });
-            }
-            else if (!string.IsNullOrEmpty(_settings.LastWallpaperPath) && !File.Exists(_settings.LastWallpaperPath))
-            {
-                DebugLog.Write($"AutoPlay: last wallpaper not found: {_settings.LastWallpaperPath}");
-            }
+            // Never start desktop WorkerW probing or video decoding at Loaded
+            // priority. First present the controls, then restore playback.
+            // Explorer and display drivers can be busy during Windows sign-in.
+            ContentRendered += OnInitialContentRendered;
         }
 
         // WPF dimensions are device-independent units. Clamp only the startup
@@ -357,6 +340,71 @@ namespace Intonaco.Views
                     _desktop.EnsurePlacement();
             };
             UpdateBackgroundTimers();
+        }
+
+        private void OnInitialContentRendered(object? sender, EventArgs e)
+        {
+            ContentRendered -= OnInitialContentRendered;
+            _firstContentRendered = true;
+
+            bool restore = _pendingWindowRestore;
+            _pendingWindowRestore = false;
+            bool silent = _startMinimized && !restore;
+            _startMinimized = false;
+
+            // A fully constructed and first-painted WPF window is safe to
+            // hide and restore. SourceInitialized is too early.
+            if (silent)
+            {
+                Hide();
+                ShowInTaskbar = false;
+            }
+
+            Opacity = 1;
+            if (restore)
+            {
+                Dispatcher.BeginInvoke(DispatcherPriority.Input,
+                    (Action)ShowMainWindow);
+            }
+
+            ScheduleStartupWallpaperAfterPaint();
+        }
+
+        private void ScheduleStartupWallpaperAfterPaint()
+        {
+            if (_startupWallpaperScheduled || !_settings.AutoPlay ||
+                string.IsNullOrWhiteSpace(_settings.LastWallpaperPath))
+                return;
+
+            string path = _settings.LastWallpaperPath;
+            if (!File.Exists(path))
+            {
+                DebugLog.Write("AutoPlay: last wallpaper missing: " + path);
+                return;
+            }
+
+            _startupWallpaperScheduled = true;
+            // Finish the first compositor frame and let Explorer settle.
+            // Doing this in Loaded blocked the first WPF paint and produced
+            // the black content window visible in the startup recording.
+            var restoreTimer = new DispatcherTimer(DispatcherPriority.Background)
+            {
+                Interval = TimeSpan.FromMilliseconds(900)
+            };
+            restoreTimer.Tick += (_, _) =>
+            {
+                restoreTimer.Stop();
+                if (_isExiting || !_settings.AutoPlay || _isApplied ||
+                    _wallpaperRequestVersion != 0 ||
+                    !string.Equals(_settings.LastWallpaperPath, path,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    !File.Exists(path))
+                    return;
+
+                DebugLog.Write("Deferred wallpaper restore after first paint: " + path);
+                ApplyWallpaper(path);
+            };
+            restoreTimer.Start();
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
