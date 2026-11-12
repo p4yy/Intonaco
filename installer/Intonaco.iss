@@ -6,7 +6,7 @@
 ; reinstalls and uninstall do not delete them.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "2.1.1"
+  #define MyAppVersion "2.1.2"
 #endif
 
 #ifndef PublishDir
@@ -18,7 +18,7 @@
 #endif
 
 #define MyAppName "Intonaco"
-#define MyAppPublisher "Intonaco Contributors"
+#define MyAppPublisher "Acev Dev Co"
 #define MyAppURL "https://github.com/p4yy/Intonaco"
 #define MyAppExeName "Intonaco.exe"
 
@@ -50,6 +50,8 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
 WizardStyle=modern
+WizardImageFile=branding\Welcome.bmp
+WizardSmallImageFile=branding\Header.bmp
 PrivilegesRequired=lowest
 MinVersion=10.0.18362
 ArchitecturesAllowed=x64
@@ -70,7 +72,7 @@ SetupLogging=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-WelcomeLabel2=This will install [name/ver] on your computer.%n%nIntonaco is self-contained: no .NET installation or administrator account is required. Your Intonaco settings are stored separately and are preserved during upgrades and uninstall.
+WelcomeLabel2=Bring your Windows desktop to life with local video wallpapers.%n%nIntonaco installs without a separate .NET download. Existing wallpapers and preferences are preserved when updating.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
