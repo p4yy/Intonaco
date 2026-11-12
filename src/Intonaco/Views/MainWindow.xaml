@@ -599,7 +599,7 @@
                                   Unchecked="OnStartMinimizedChanged">
                             <StackPanel>
                                 <TextBlock Text="Start minimized" Style="{StaticResource SettingTitleText}" />
-                                <TextBlock Text="Open Intonaco in the system tray"
+                                <TextBlock Text="Launch in the tray when Windows starts"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
                         </CheckBox>
