@@ -498,14 +498,20 @@ namespace Intonaco.Core
         private async Task SendAsync(object[] command)
         {
             StreamWriter? writer = _writer;
-            if (writer == null || _session?.IsCancellationRequested != false)
+            CancellationTokenSource? session = _session;
+            if (writer == null || session == null ||
+                session.IsCancellationRequested)
                 return;
 
             try
             {
-                await _sendLock.WaitAsync(_session.Token).ConfigureAwait(false);
+                await _sendLock.WaitAsync(session.Token).ConfigureAwait(false);
                 try
                 {
+                    if (!ReferenceEquals(session, _session) ||
+                        session.IsCancellationRequested)
+                        return;
+
                     await writer.WriteLineAsync(
                         JsonSerializer.Serialize(new { command }))
                         .ConfigureAwait(false);
