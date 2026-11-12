@@ -245,7 +245,9 @@ namespace Intonaco.Core
                 "--no-config", "--no-terminal", "--no-border",
                 "--no-osc", "--osd-level=0", "--force-window=yes",
                 "--keep-open=yes", "--input-default-bindings=no",
-                "--hwdec=auto-safe", "--vo=gpu", "--interpolation=no",
+                // Prefer modern libplacebo color conversion and HDR tone mapping.
+                // Fall back to the legacy GPU renderer on older mpv builds.
+                "--hwdec=auto-safe", "--vo=gpu-next,gpu", "--interpolation=no",
                 "--demuxer-readahead-secs=2",
                 "--demuxer-max-bytes=16MiB",
                 "--wid=" + unchecked((uint)_host.Handle.ToInt64())
