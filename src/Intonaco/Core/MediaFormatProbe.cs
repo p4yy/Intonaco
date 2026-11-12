@@ -24,7 +24,7 @@ namespace Intonaco.Core
         // that every stream inside the container can be decoded.
         private static readonly string[] VideoExtensions =
         {
-            ".mp4", ".m4v", ".mp4v", ".mov", ".qt",
+            ".mp4", ".m4v", ".mp4v", ".mov", ".qt", ".mlw",
             ".mkv", ".webm", ".avi", ".wmv", ".asf",
             ".mpg", ".mpeg", ".m2ts", ".mts", ".m2t", ".ts",
             ".3gp", ".3g2", ".3gpp", ".vob",
@@ -44,7 +44,7 @@ namespace Intonaco.Core
             };
 
         public static string FileDialogFilter =>
-            "Video files|" +
+            "Video files and MLW wallpapers|" +
             string.Join(";", Array.ConvertAll(VideoExtensions, ext => "*" + ext)) +
             "|All files|*.*";
 
