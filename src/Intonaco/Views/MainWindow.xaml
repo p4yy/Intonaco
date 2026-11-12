@@ -123,7 +123,7 @@
                                            FontWeight="SemiBold"
                                            HorizontalAlignment="Center"
                                            Margin="0,10,0,0" />
-                                <TextBlock Text="Drop an MP4 here or choose a video"
+                                <TextBlock x:Name="PreviewHintText" Text="Drop a video here or choose a file"
                                            Style="{StaticResource CaptionText}"
                                            HorizontalAlignment="Center"
                                            Margin="0,4,0,0" />
@@ -419,6 +419,28 @@
 
                 <Border Style="{StaticResource CardBorder}" Padding="0">
                     <StackPanel>
+                        <!-- Optional renderer. No MPV binaries are bundled with Intonaco. -->
+                        <Grid Margin="16,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Video engine" Style="{StaticResource SettingTitleText}" />
+                                <TextBlock Text="Windows is built in; MPV is optional"
+                                           Style="{StaticResource SettingDescriptionText}" />
+                            </StackPanel>
+                            <ComboBox x:Name="BackendComboBox"
+                                      Grid.Column="1"
+                                      Style="{StaticResource IntonacoComboBox}"
+                                      Width="155" VerticalAlignment="Center"
+                                      AutomationProperties.Name="Video playback engine"
+                                      SelectionChanged="OnBackendChanged">
+                                <ComboBoxItem Content="Windows" Tag="Windows" IsSelected="True" />
+                                <ComboBoxItem Content="MPV (optional)" Tag="MPV" />
+                            </ComboBox>
+                        </Grid>
+                        <Border Height="1" Margin="16,0" Background="{DynamicResource DividerBrush}" />
                         <Grid Margin="16,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
