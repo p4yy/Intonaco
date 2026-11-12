@@ -624,7 +624,7 @@ namespace Intonaco.Core
                 return false;
             }
 
-            if (!snapshot.HasDesktopSplit)
+            if (!snapshot.HasDesktopSplit && snapshot.Layout != DesktopLayout.RaisedProgman)
             {
                 LastError = "Windows has not prepared its wallpaper layer. Try again after Explorer is ready.";
                 DebugLog.Write("Attach skipped: no WorkerW wallpaper layer; no blocking shell setup on the UI thread.");
