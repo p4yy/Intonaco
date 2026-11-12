@@ -514,6 +514,38 @@
                                         Style="{StaticResource GhostButton}" Click="OnCopyWallpaperSource"
                                         MinWidth="96" Height="32" />
                             </Grid>
+                            <Grid Margin="0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="WallpaperWaifu" Style="{StaticResource SettingTitleText}" />
+                                    <TextBlock Text="Animated wallpapers, anime and games"
+                                               Style="{StaticResource SettingDescriptionText}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Copy link" Tag="https://wallpaperwaifu.com/"
+                                        Style="{StaticResource GhostButton}" Click="OnCopyWallpaperSource"
+                                        MinWidth="96" Height="32" />
+                            </Grid>
+                            <Border Height="1" Background="{DynamicResource DividerBrush}" />
+
+                            <Grid Margin="0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="LWP.gg" Style="{StaticResource SettingTitleText}" />
+                                    <TextBlock Text="Curated moving backgrounds"
+                                               Style="{StaticResource SettingDescriptionText}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Copy link" Tag="https://lwp.gg/"
+                                        Style="{StaticResource GhostButton}" Click="OnCopyWallpaperSource"
+                                        MinWidth="96" Height="32" />
+                            </Grid>
+                            <Border Height="1" Background="{DynamicResource DividerBrush}" />
+
                             <TextBlock Text="Independent websites. Check each download format and usage rights. Intonaco uses local video files."
                                        Style="{StaticResource SettingDescriptionText}"
                                        TextWrapping="Wrap" Margin="0,10,0,0" />
