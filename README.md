@@ -50,6 +50,12 @@ Download the **Intonaco Wallpaper** installer or portable build from [GitHub Rel
 
 Intonaco has its **own lightweight native media-preparation layer**. It recognizes container signatures, validates local files, and corrects nonstandard MP4 pixel-aspect metadata without re-encoding the video. Playback then uses **Windows Media Foundation**, retaining its available hardware-assisted decoding without shipping an additional codec engine.
 
+**MLW compatibility (v2.1.3 testing candidate):** Intonaco detects .mlw
+files containing standard video bytes or ZIP-wrapped playable videos,
+imports a local cached copy, and preserves the original. Protected or
+proprietary .mlw files are not yet decoded; obtain an MP4 from the original
+provider when possible.
+
 **Common containers:** MP4, M4V, MOV, MKV, WebM, AVI, WMV, ASF, MPEG, MPEG-TS, M2TS and 3GP. Intonaco also allows opening uncommon video containers such as FLV, OGV, RMVB and MXF, but **those are not guaranteed to play**. Both container support and the video/audio codec must be available through Windows Media Foundation. MKV is a container, not a codec.
 
 - **Small default build:** MPV/FFmpeg libraries are not bundled; Windows Media Foundation plays videos with no external playback process.
@@ -76,6 +82,9 @@ Native Windows remains the default. Video engine compatibility, output quality a
 ## Use
 
 1. Open Intonaco Wallpaper and choose a video, or drop a video on the window.
+   The default **still preview** uses a video thumbnail to reduce CPU/GPU
+   usage while the desktop wallpaper animates. Select **Play live preview**
+   if you explicitly want motion in the control window too.
 2. Choose fit, volume, preferred frame rate and looping.
 3. Minimize to the system tray. The desktop wallpaper continues without the second preview decoder.
 4. Pause from the tray when you want a still frame without changing your desktop.
