@@ -24,7 +24,7 @@ namespace Intonaco.Core
     /// what produced black borders. Resume is therefore just Play() on the
     /// same pipeline - no reopen, no seek, no frame replacement.
     /// </summary>
-    public sealed class WallpaperPlayer : IDisposable
+    public sealed class WallpaperPlayer : IWallpaperPlayer
     {
         private const int MaxPausedFrameWidth = 3840;
         private const int MaxPausedFrameHeight = 2160;
@@ -392,7 +392,7 @@ namespace Intonaco.Core
         /// live MediaElement: no frozen bitmap is carried over from the
         /// previous (now destroyed) player window.
         /// </summary>
-        internal void PauseAt(TimeSpan position)
+        public void PauseAt(TimeSpan position)
         {
             if (_disposed || _mediaElement == null ||
                 (CurrentState != PlaybackState.Playing && CurrentState != PlaybackState.Paused))
