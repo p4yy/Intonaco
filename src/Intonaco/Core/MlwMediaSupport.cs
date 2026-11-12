@@ -48,7 +48,6 @@ namespace Intonaco.Core
                 _ => string.Empty
             };
 
-            ZipArchiveEntry? _ = null; // An archive is opened later under the lock.
             bool zipWrapped = extension.Length == 0 && IsZipHeader(original);
             if (extension.Length == 0 && !zipWrapped)
                 throw new NotSupportedException(
