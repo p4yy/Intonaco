@@ -36,6 +36,10 @@ jobs:
           & $msbuild native/IntonacoVideo/IntonacoVideo.vcxproj /m /p:Platform=x64 /p:Configuration=Release
           if ($LASTEXITCODE -ne 0) { throw "Native engine compilation failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path artifacts/native/IntonacoVideo.dll)) { throw 'Native engine DLL missing.' }
+          & $msbuild native/IntonacoVideo/IntonacoVideo.Tests.vcxproj /m /p:Platform=x64 /p:Configuration=Release
+          if ($LASTEXITCODE -ne 0) { throw 'Native geometry test compilation failed' }
+          & ./artifacts/native-tests/IntonacoVideoTests.exe
+          if ($LASTEXITCODE -ne 0) { throw "Aspect-ratio and crop tests failed: $LASTEXITCODE" }
 
       - name: Restore and compile WPF application
         shell: pwsh
