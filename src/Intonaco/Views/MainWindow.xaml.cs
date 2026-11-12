@@ -1690,9 +1690,20 @@ namespace Intonaco.Views
         {
             if (_isExiting) return;
 
-            string detail = NativeMediaEngine.IsLikelyDecoderFailure(message)
-                ? NativeMediaEngine.CodecHelp + " Details: " + message
-                : message;
+            string detail;
+            if (_player is MpvWallpaperPlayer)
+            {
+                detail = "MPV could not play this video. Verify your optional MPV " +
+                    "installation and its supported codecs. Details: " + message;
+            }
+            else
+            {
+                detail = NativeMediaEngine.IsLikelyDecoderFailure(message)
+                    ? NativeMediaEngine.CodecHelp +
+                        " You can also select the optional MPV backend in Playback settings. " +
+                        "Details: " + message
+                    : message;
+            }
 
             NotifyPlaybackError(detail);
             // If this video cannot be decoded, restore the previous source
