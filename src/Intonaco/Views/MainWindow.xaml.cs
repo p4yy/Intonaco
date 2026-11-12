@@ -972,6 +972,93 @@ namespace Intonaco.Views
             }
         }
 
+        /// <summary>
+        /// A static Windows video thumbnail prevents a second media decoder
+        /// from running continuously beside the desktop player. It also
+        /// keeps the UI populated if the optional video preview cannot paint.
+        /// </summary>
+        private void ShowStaticPreview()
+        {
+            if (PreviewMedia.Source != null)
+                ReleasePreviewPipeline();
+
+            if (_previewFilePath == null)
+            {
+                PreviewImage.Source = null;
+                PreviewImage.Visibility = Visibility.Collapsed;
+                PreviewPlaceholder.Visibility = Visibility.Visible;
+                return;
+            }
+
+            if (_thumbnailImage != null)
+            {
+                PreviewImage.Source = _thumbnailImage;
+                PreviewImage.Visibility = Visibility.Visible;
+                PreviewPlaceholder.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                PreviewImage.Source = null;
+                PreviewImage.Visibility = Visibility.Collapsed;
+                PreviewPlaceholder.Visibility = Visibility.Visible;
+                PreviewHintText.Text = _thumbnailRequestedFor == null
+                    ? "Loading video thumbnail..."
+                    : "Wallpaper plays on your desktop";
+            }
+
+            if (!string.Equals(_thumbnailRequestedFor, _previewFilePath,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                string path = _previewFilePath;
+                _thumbnailRequestedFor = path;
+                int requestId = _previewThumbnailVersion;
+                _ = LoadStaticPreviewAsync(path, requestId);
+            }
+        }
+
+        private async System.Threading.Tasks.Task LoadStaticPreviewAsync(
+            string filePath, int requestId)
+        {
+            BitmapSource? image = null;
+            try
+            {
+                image = await VideoThumbnail.LoadAsync(filePath);
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Thumbnail extraction failed: " + ex.Message);
+            }
+
+            if (_isExiting || requestId != _previewThumbnailVersion ||
+                !string.Equals(_previewFilePath, filePath,
+                    StringComparison.OrdinalIgnoreCase))
+                return;
+
+            _thumbnailImage = image;
+            if (!_livePreviewEnabled)
+                ShowStaticPreview();
+        }
+
+        private void OnToggleLivePreview(object sender, RoutedEventArgs e)
+        {
+            if (_previewFilePath == null || _player is MpvWallpaperPlayer)
+                return;
+
+            _livePreviewEnabled = !_livePreviewEnabled;
+            PreviewModeButton.Content = _livePreviewEnabled
+                ? "Use still preview" : "Play live preview";
+            RefreshPreviewForCurrentState();
+        }
+
+        private void OnPreviewMediaFailed(object sender, ExceptionRoutedEventArgs e)
+        {
+            DebugLog.Write("Optional preview decoder failed: " +
+                e.ErrorException?.Message);
+            _livePreviewEnabled = false;
+            PreviewModeButton.Content = "Play live preview";
+            ShowStaticPreview();
+        }
+
         private void StartPreview()
         {
             if (!_livePreviewEnabled || _previewFilePath == null ||
