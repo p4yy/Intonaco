@@ -101,23 +101,19 @@ namespace Intonaco.Tests
         public void RecognisedContainers_AreSupported(string fileName)
         {
             Assert.True(MediaFormatProbe.IsSupportedExtension(fileName));
-            Assert.False(MediaFormatProbe.IsKnownUnsupportedExtension(fileName));
+            Assert.False(MediaFormatProbe.IsUncommonContainer(fileName));
         }
 
         [Theory]
         [InlineData("clip.flv")]
         [InlineData("clip.rmvb")]
-        [InlineData("clip.vob")]
         [InlineData("clip.ogv")]
         [InlineData("clip.divx")]
         [InlineData("clip.mxf")]
-        [InlineData("clip.gif")]
-        [InlineData("clip.webp")]
-        public void CompatibilityFormats_AreAcceptedButFlaggedForConversion(string fileName)
+        public void UncommonContainers_AreOfferedAsNativeAttempts(string fileName)
         {
             Assert.True(MediaFormatProbe.IsSupportedExtension(fileName));
-            Assert.True(MediaFormatProbe.RequiresCompatibilityConversion(fileName));
-            Assert.True(MediaFormatProbe.IsKnownUnsupportedExtension(fileName));
+            Assert.True(MediaFormatProbe.IsUncommonContainer(fileName));
             Assert.Contains("*" + Path.GetExtension(fileName),
                 MediaFormatProbe.FileDialogFilter, StringComparison.OrdinalIgnoreCase);
         }
@@ -128,27 +124,57 @@ namespace Intonaco.Tests
         [InlineData("movie.mp4")]
         [InlineData("clip.avi")]
         [InlineData("clip.mts")]
-        public void NativeCandidates_DoNotForceAnExpensiveConversion(string fileName)
+        public void CommonContainers_UseTheNativePipeline(string fileName)
         {
             Assert.True(MediaFormatProbe.IsSupportedExtension(fileName));
-            Assert.False(MediaFormatProbe.RequiresCompatibilityConversion(fileName));
+            Assert.False(MediaFormatProbe.IsUncommonContainer(fileName));
+        }
+
+        [Theory]
+        [InlineData("clip.gif")]
+        [InlineData("clip.webp")]
+        [InlineData("clip.apng")]
+        [InlineData("clip.exe")]
+        public void NonVideoFormats_AreNotMisrepresentedAsVideo(string fileName)
+        {
+            Assert.False(MediaFormatProbe.IsSupportedExtension(fileName));
         }
 
         [Fact]
-        public void CompatibilityFile_PassesPreflightWhenReadable()
+        public void ContainerSniffer_IdentifiesIsoBmffAndMatroska()
         {
-            string path = Path.Combine(Path.GetTempPath(),
-                "intonaco-test-" + Guid.NewGuid().ToString("N") + ".flv");
-            File.WriteAllBytes(path, new byte[] { 0x46, 0x4C, 0x56, 0x01 });
-            try
-            {
-                Assert.True(MediaFormatProbe.TryValidate(path, out string error));
-                Assert.Equal(string.Empty, error);
-            }
-            finally
-            {
-                File.Delete(path);
-            }
+            byte[] mp4 = new byte[] { 0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0, 0, 0, 0 };
+            byte[] mkv = new byte[] { 0x1A, 0x45, 0xDF, 0xA3, 0x93, 0x42 };
+
+            Assert.Equal(NativeMediaEngine.Container.IsoBmff,
+                NativeMediaEngine.IdentifyContainer(mp4));
+            Assert.Equal(NativeMediaEngine.Container.Matroska,
+                NativeMediaEngine.IdentifyContainer(mkv));
+        }
+
+        [Fact]
+        public void ContainerSniffer_IdentifiesAviAndTransportStream()
+        {
+            byte[] avi = new byte[] {
+                (byte)'R', (byte)'I', (byte)'F', (byte)'F',
+                0, 0, 0, 0, (byte)'A', (byte)'V', (byte)'I', (byte)' '
+            };
+            byte[] transport = new byte[376];
+            transport[0] = 0x47;
+            transport[188] = 0x47;
+
+            Assert.Equal(NativeMediaEngine.Container.Avi,
+                NativeMediaEngine.IdentifyContainer(avi));
+            Assert.Equal(NativeMediaEngine.Container.MpegTransport,
+                NativeMediaEngine.IdentifyContainer(transport));
+        }
+
+        [Fact]
+        public void ContainerSniffer_DoesNotClaimUnknownBytesAreVideo()
+        {
+            byte[] unknown = new byte[] { 0x44, 0x42, 0x31, 0x6E };
+            Assert.Equal(NativeMediaEngine.Container.Unknown,
+                NativeMediaEngine.IdentifyContainer(unknown));
         }
 
         [Theory]
@@ -157,9 +183,10 @@ namespace Intonaco.Tests
         [InlineData("0xC00D5212", true)]
         [InlineData("File not found", false)]
         [InlineData("Access denied", false)]
-        public void CodecFailure_IsSeparatedFromFileAccessErrors(string error, bool expected)
+        public void DecoderFailure_IsSeparatedFromFileAccessErrors(
+            string message, bool expected)
         {
-            Assert.Equal(expected, MediaCompatibility.IsLikelyDecoderFailure(error));
+            Assert.Equal(expected, NativeMediaEngine.IsLikelyDecoderFailure(message));
         }
 
         [Fact]
