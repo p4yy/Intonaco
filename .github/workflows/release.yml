@@ -155,14 +155,15 @@ jobs:
           body: |
             ## Intonaco v${{ steps.version.outputs.version }}
 
-            Compact native Windows controls with safer launch and restore behavior.
+            Discover live wallpaper sources without leaving Intonaco, and reliably restore from desktop shortcuts.
 
             ### Highlights
-            - Opens in a compact, tall window by default, clamped to available screen height.
-            - Manual app launches open the controls, even if Windows sign-in is configured to start silently.
-            - Minimized/tray windows restore to Normal before showing, with preview refresh after layout.
-            - Previous native UI, video handling and background efficiency improvements retained.
-            - Standalone Store MSIX preview packaging is kept separate from the GitHub installer.
+            - New, compact **Get live wallpapers** section with copyable addresses for six trusted third-party catalogs.
+            - Copy actions never auto-redirect or open a browser; supported videos are opened locally after download.
+            - Desktop shortcut re-launch signals are preserved even during initial window loading.
+            - Single-column recent items stay clean at the compact default window size.
+            - Branded installer panel uses the official Intonaco logo and lists publisher **Acev Dev Co**.
+            - No new background network activity or playback overhead.
 
             ### Download
             - `Intonaco-v${{ steps.version.outputs.version }}-win-x64-setup.exe` — Windows installer.
@@ -177,8 +178,10 @@ jobs:
             **Hardware testing:** Windows CI covers compilation, tests and installer smoke
             checks. The new MPV backend still requires real Windows hardware validation.
             It is optional and not bundled. Media codec support and memory/GPU savings
-            are hardware-dependent. Store EXE submission additionally requires trusted
-            code signing, which is not included in this build.
+            are hardware-dependent. Windows may display "Unknown publisher" until
+            the EXE or installer receives a trusted Authenticode signature.
+            The separate Store MSIX upload requires the exact Partner Center
+            package identity and publisher; no Store publication is performed here.
 
             [Changelog](https://github.com/${{ github.repository }}/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md)
             · [Verification](https://github.com/${{ github.repository }}/blob/${{ steps.version.outputs.tag }}/docs/VERIFICATION.md)
