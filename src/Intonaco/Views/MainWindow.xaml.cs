@@ -280,6 +280,8 @@ namespace Intonaco.Views
             Closing += OnWindowClosing;
             StateChanged += OnWindowStateChanged;
             IsVisibleChanged += OnMainWindowVisibleChanged;
+            Activated += OnMainWindowActivityChanged;
+            Deactivated += OnMainWindowActivityChanged;
         }
 
         private void OnWindowLoaded(object sender, RoutedEventArgs e)
@@ -801,8 +803,32 @@ namespace Intonaco.Views
                 : duration.ToString(@"m\:ss");
         }
 
+        // A separate video decoder is useful only while the user is actually
+        // interacting with Intonaco. Release it when switching applications.
         private bool IsPreviewWindowVisible =>
-            IsVisible && WindowState != WindowState.Minimized;
+            IsVisible && WindowState != WindowState.Minimized && IsActive;
+
+        private void OnMainWindowActivityChanged(object? sender, EventArgs e)
+        {
+            if (_isExiting || !IsLoaded)
+                return;
+
+            RefreshPreviewForCurrentState();
+            UpdateSeekTimer();
+        }
+
+        // Keep the media preview in a balanced 16:9 frame instead of a thin
+        // panoramic strip when the app is maximized. This changes only the
+        // settings window, never the desktop wallpaper's original aspect.
+        private void OnPreviewPanelSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (!e.WidthChanged || e.NewSize.Width <= 0)
+                return;
+
+            double desiredHeight = Math.Clamp(e.NewSize.Width * 9.0 / 16.0, 230, 596.25);
+            if (Math.Abs(PreviewPanel.Height - desiredHeight) > 0.5)
+                PreviewPanel.Height = desiredHeight;
+        }
 
         private void UpdatePreview(string filePath)
         {
@@ -1200,7 +1226,7 @@ namespace Intonaco.Views
 
             _placementTimer.Interval =
                 _player.CurrentState == WallpaperPlayer.PlaybackState.Playing
-                    ? TimeSpan.FromSeconds(5)
+                    ? TimeSpan.FromSeconds(10)
                     : TimeSpan.FromSeconds(15);
 
             if (!_placementTimer.IsEnabled)
