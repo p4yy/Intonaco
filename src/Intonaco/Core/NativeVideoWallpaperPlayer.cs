@@ -178,7 +178,8 @@ namespace Intonaco.Core
                     throw new InvalidOperationException(
                         "Could not initialize the native GPU rendering thread.");
                 SendOptions();
-                iv_open(_engine, _path);
+                // MediaEngine expects a file URI, not a raw C:\\ path.
+                iv_open(_engine, new Uri(_path).AbsoluteUri);
                 SetState(WallpaperPlayer.PlaybackState.Playing);
                 _poll.Start();
                 return true;
