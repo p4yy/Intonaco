@@ -31,7 +31,7 @@ keep your preferred setup between sessions.
 - Resume your previous wallpaper and optionally start with Windows.
 - Explore popular independent wallpaper-video websites using copyable links.
 
-Intonaco uses local video files. The optional third-party catalog section
+Intonaco Wallpaper uses local video files. The optional third-party catalog section
 copies website addresses to your clipboard; it doesn't fetch, scrape,
 automatically redirect, download, or distribute other creators' wallpapers.
 Third-party websites have their own licensing terms.
@@ -44,7 +44,7 @@ built in; an optional MPV engine may be used when separately installed.
 - New compact section with copyable wallpaper source addresses.
 - More reliable opening of the app from desktop and Start menu shortcuts.
 - Cleaner wallpaper history layout for the narrow default window.
-- Updated installer presentation and company metadata.
+- Consistent Intonaco Wallpaper app branding and company metadata.
 
 ## Store submission requirements
 1. Reserve *Intonaco Wallpaper* (the green availability check is not the reservation).
