@@ -391,9 +391,22 @@ namespace Intonaco.Views
             {
                 Interval = TimeSpan.FromMilliseconds(900)
             };
-            restoreTimer.Tick += (_, _) =>
+            restoreTimer.Tick += async (_, _) =>
             {
                 restoreTimer.Stop();
+
+                // Explorer's desktop-layer split performs a bounded Win32
+                // wait. Prepare it on a worker thread so the settings UI can
+                // paint and respond even during Windows sign-in.
+                try
+                {
+                    await _desktop.PrepareDesktopLayerAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    DebugLog.Write("Background desktop preparation: " + ex.Message);
+                }
+
                 if (_isExiting || !_settings.AutoPlay || _isApplied ||
                     _wallpaperRequestVersion != 0 ||
                     !string.Equals(_settings.LastWallpaperPath, path,
