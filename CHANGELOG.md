@@ -6,7 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.1.2] — 2026-11-12
 
-A cleaner wallpaper-discovery workflow and more reliable desktop shortcut activation.
+A consistent Intonaco Wallpaper identity, cleaner discovery and more reliable desktop shortcut activation.
 
 ### Added
 - Compact, expandable **Get live wallpapers** section with six curated
@@ -24,6 +24,14 @@ A cleaner wallpaper-discovery workflow and more reliable desktop shortcut activa
   events settle, using the same UI restoration path as the tray shortcut.
 
 ### Improved
+- Product renamed to **Intonaco Wallpaper** across windows, tray, About,
+  installer, Start menu, official wordmarks, Windows version info and Store
+  packaging. The internal executable and settings folder retain their
+  original names so upgrades don't disrupt user files or startup entries.
+- Official release filenames are consistent and no longer duplicate the
+  setup EXE and portable EXE under multiple aliases.
+- Small compiler and analysis warnings cleaned up without changing the
+  video decoding or playback logic.
 - Single-column recent-wallpaper rows fit the compact default width
   without crowding.
 - The wallpaper directory is collapsed by default for less visual clutter;
