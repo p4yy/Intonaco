@@ -1,6 +1,11 @@
 name: Store MSIX
 
 on:
+  push:
+    branches: ['main']
+    paths:
+      - 'store/**'
+      - '.github/workflows/store-msix.yml'
   pull_request:
     paths:
       - 'src/**'
@@ -83,10 +88,24 @@ jobs:
             -PublisherDisplayName $display `
             -Version "$version.0" `
             -OutputPath $output
-      - name: Upload unsigned MSIX artifact
+      - name: Verify real Partner Center identity and create Store upload
+        shell: pwsh
+        run: |
+          $identity = Get-Content -LiteralPath store/partner-center-identity.json -Raw |
+            ConvertFrom-Json
+          $package = Get-ChildItem artifacts/store -Filter '*.msix' -File |
+            Select-Object -First 1
+          if (-not $package) { throw 'Store MSIX package was not created.' }
+          ./store/Make-StoreUpload.ps1 `
+            -MsixPath $package.FullName `
+            -ExpectedIdentityName $identity.package_identity_name `
+            -ExpectedPublisherDn $identity.publisher_distinguished_name `
+            -ExpectedPublisherDisplayName $identity.publisher_display_name
+
+      - name: Upload Partner Center submission file (unsigned)
         uses: actions/upload-artifact@v4
         with:
-          name: Intonaco-Wallpaper-PartnerCenter-MSIX-unsigned
-          path: artifacts/store/*.msix
+          name: Intonaco-Wallpaper-PartnerCenter-StoreUpload
+          path: artifacts/store/*.msixupload
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
