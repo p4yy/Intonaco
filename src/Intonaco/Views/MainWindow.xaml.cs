@@ -302,6 +302,17 @@ namespace Intonaco.Views
             _systemEvents.Start();
             UpdateTitleBarTheme();
 
+            // Upgrade old registration commands that always forced a tray
+            // launch, even if the current preference wants a visible window.
+            if (StartupManager.IsRegistered)
+            {
+                string registered = StartupManager.GetRegisteredValue() ?? "";
+                bool registeredMinimized = registered.Contains(
+                    "--minimized", StringComparison.OrdinalIgnoreCase);
+                if (registeredMinimized != _settings.StartMinimized)
+                    StartupManager.Register(_settings.StartMinimized);
+            }
+
             _placementTimer = new DispatcherTimer(DispatcherPriority.Background)
             {
                 Interval = TimeSpan.FromSeconds(5)
@@ -1405,7 +1416,7 @@ namespace Intonaco.Views
             if (_suppressEvents) return;
 
             if (StartWithWindowsToggle.IsChecked == true)
-                StartupManager.Register();
+                StartupManager.Register(_settings.StartMinimized);
             else
                 StartupManager.Unregister();
 
@@ -2083,6 +2094,7 @@ namespace Intonaco.Views
                     return;
                 Activate();
                 Focus();
+                InvalidateVisual();
                 RefreshPreviewForCurrentState();
                 UpdateSeekTimer();
             }));
