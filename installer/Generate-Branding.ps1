@@ -27,14 +27,14 @@ function Build-Panel([int]$width, [int]$height, [string]$filename, [bool]$welcom
             $size = [int]($width * 0.70)
             $left = [int](($width - $size) / 2)
             $graphics.DrawImage($source, $left, [int]($height * 0.19), $size, $size)
-            $fontTitle = [System.Drawing.Font]::new("Segoe UI", 34,
+            $fontTitle = [System.Drawing.Font]::new("Segoe UI", 28,
                 [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
             $fontSubtitle = [System.Drawing.Font]::new("Segoe UI", 17,
                 [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
             try {
                 $format = [System.Drawing.StringFormat]::new()
                 $format.Alignment = [System.Drawing.StringAlignment]::Center
-                $graphics.DrawString("Intonaco", $fontTitle, $foreground,
+                $graphics.DrawString("Intonaco Wallpaper", $fontTitle, $foreground,
                     [System.Drawing.RectangleF]::new(0, [int]($height * 0.65), $width, 58), $format)
                 $graphics.DrawString("Video wallpapers for Windows", $fontSubtitle, $secondary,
                     [System.Drawing.RectangleF]::new(0, [int]($height * 0.73), $width, 38), $format)
