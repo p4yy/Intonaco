@@ -46,22 +46,18 @@ Download an installer or portable build from [GitHub Releases](https://github.co
 | Portable self-contained EXE / zip | No separate .NET installation needed |
 | Framework-dependent zip | .NET 8 Desktop Runtime |
 
-## Video format compatibility
+## Native video engine and format support
 
-Intonaco opens the usual Windows formats directly when the installed system codecs permit: **MP4, M4V, MOV, MKV, WebM, AVI, WMV, ASF, MPEG, MPEG-TS, M2TS and 3GP**. MKV and WebM containers are accepted, but their actual video codecs still determine whether Windows Media Foundation can decode them.
+Intonaco has its **own lightweight native media-preparation layer**. It recognizes container signatures, validates local files, and corrects nonstandard MP4 pixel-aspect metadata without re-encoding the video. Playback then uses **Windows Media Foundation**, retaining its available hardware-assisted decoding without shipping an additional codec engine.
 
-For harder formats such as **FLV, VOB, OGV, RMVB, DivX, MXF, GIF and animated WebP**, an **optional FFmpeg** executable enables compatibility conversion. Unsupported native codecs can also trigger an automatic retry through that conversion path.
+**Common containers:** MP4, M4V, MOV, MKV, WebM, AVI, WMV, ASF, MPEG, MPEG-TS, M2TS and 3GP. Intonaco also allows opening uncommon video containers such as FLV, OGV, RMVB and MXF, but **those are not guaranteed to play**. Both container support and the video/audio codec must be available through Windows Media Foundation. MKV is a container, not a codec.
 
-To enable this optional feature, install FFmpeg from [ffmpeg.org/download.html](https://ffmpeg.org/download.html), then either add `ffmpeg.exe` to Windows `PATH`, place it next to `Intonaco.exe`, or set `INTONACO_FFMPEG` to the full executable path. Restart Intonaco afterward.
+- **No FFmpeg dependency:** no bundled codec libraries, external conversion executables, browser runtime, downloads, or playback subprocesses.
+- **No quality loss:** normal playback reads the original file; the rare MP4 aspect-ratio repair modifies only metadata in a separate cached copy, leaving video samples and your original file unchanged.
+- **Safe by default:** no automatic lossy transcode; unsupported codecs produce a clear explanation, and Intonaco can restore the last working wallpaper rather than leaving a black desktop.
+- **Video-only input:** animated GIF, animated WebP and APNG are not yet supported by the native video renderer and are not advertised as compatible video files.
 
-- **Native first:** supported videos play without conversion or extra services.
-- **Copy before encode:** FFmpeg first tries a video-stream-copy MP4 remux, which leaves the original encoded video frames untouched. If Windows rejects that result, Intonaco tries an H.264/AAC compatibility encoding at high quality.
-- **Originals untouched:** prepared files are cached in `%LocalAppData%\\Intonaco\\compatible-video`, and conversions run only when a wallpaper is selected or an incompatible codec is encountered.
-- **Safe failures:** unreadable files and failed preparation do not replace an already-playing wallpaper. A working wallpaper can also be restored after an incompatible decoder failure.
-
-Optional conversion takes CPU time and extra disk space **once per source**; native playback remains the lightweight default. FFmpeg is **not bundled or downloaded automatically**. Some DRM-protected, corrupted, and highly unusual files cannot be played. No application can truthfully guarantee every media format.
-
-A GPU supporting hardware video decode is recommended. For best compatibility and efficient ongoing playback, prefer standard **H.264 MP4** files.
+**Important:** A small native app cannot decode *every codec* on its own. For maximum compatibility, use **H.264 MP4**. For other containers, install Windows Media Foundation-compatible codecs when required. We do not claim unsupported codecs are playable or that this implementation replaces FFmpeg's global codec coverage.
 
 ## Use
 
