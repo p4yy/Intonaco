@@ -132,6 +132,18 @@ namespace Intonaco.Core
 
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (Path.GetExtension(path).Equals(".mlw", StringComparison.OrdinalIgnoreCase))
+            {
+                // Proprietary MLW.VIDEO is not a media codec. Authenticate and
+                // import it once off the UI thread to a reusable local MP4.
+                // Unsupported MLW variants fail before opening any decoder.
+                string mp4Path = await MlwVideoImporter.PrepareAsync(
+                    path, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                return await Mp4AspectSafety.PrepareAsync(mp4Path)
+                    .ConfigureAwait(false);
+            }
+
             // No per-frame work or external executable. Both lightweight
             // container inspection and optional metadata correction happen
             // away from the WPF dispatcher.
