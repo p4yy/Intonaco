@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
@@ -16,6 +18,33 @@ namespace Intonaco
         private const string ShowExistingEventName = @"Local\Intonaco_ShowMainWindow";
         private bool _ownsMutex;
         private bool _pendingShowExisting;
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool AllowSetForegroundWindow(uint processId);
+
+        private static void PermitPrimaryWindowActivation()
+        {
+            // Windows restricts background processes from taking focus.
+            // A foreground desktop-shortcut launch may explicitly delegate
+            // focus rights to the already-running Intonaco instance.
+            try
+            {
+                using var current = Process.GetCurrentProcess();
+                foreach (var process in Process.GetProcessesByName("Intonaco"))
+                {
+                    using (process)
+                    {
+                        if (process.Id != current.Id)
+                            AllowSetForegroundWindow((uint)process.Id);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Focus delegation unavailable: " + ex.Message);
+            }
+        }
 
         // Called on the UI dispatcher by MainWindow.Loaded. A second
         // instance can signal before StartupUri creates the window.
@@ -46,6 +75,7 @@ namespace Intonaco
                 {
                     try
                     {
+                        PermitPrimaryWindowActivation();
                         using var signal = EventWaitHandle.OpenExisting(ShowExistingEventName);
                         signal.Set();
                     }

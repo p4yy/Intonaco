@@ -6,7 +6,7 @@
 ; reinstalls and uninstall do not delete them.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "2.1.3"
+  #define MyAppVersion "2.1.4"
 #endif
 
 #ifndef PublishDir
@@ -26,7 +26,7 @@
 AppId={{D28B4A1C-5663-409B-A94B-6BA5E2BB314F}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-AppVerName={#MyAppName} {#MyAppVersion}
+AppVerName={#MyAppName}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}/issues
@@ -43,7 +43,7 @@ DisableProgramGroupPage=yes
 AllowNoIcons=no
 LicenseFile=..\LICENSE
 OutputDir={#OutputDir}
-OutputBaseFilename=Intonaco-Wallpaper-v{#MyAppVersion}-win-x64-setup
+OutputBaseFilename=Intonaco-Wallpaper-Setup
 SetupIconFile=..\src\Intonaco\Assets\intonaco.ico
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
