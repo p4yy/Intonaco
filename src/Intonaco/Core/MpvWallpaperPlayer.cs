@@ -572,7 +572,7 @@ namespace Intonaco.Core
                 seconds = Math.Min(seconds, Duration.TotalSeconds);
             SetPositionBase(TimeSpan.FromSeconds(seconds));
             if (_opened)
-                _ = SendAsync(new object[] { "seek", seconds, "absolute", "exact" });
+                _ = SendAsync(new object[] { "seek", seconds, "absolute+exact" });
             else
                 _ = SendAsync(new object[] {
                     "set_property", "time-pos", seconds
