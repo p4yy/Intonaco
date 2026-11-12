@@ -2304,42 +2304,35 @@ namespace Intonaco.Views
 
         private void OnWindowStateChanged(object? sender, EventArgs e)
         {
-            if (WindowState == WindowState.Minimized)
-            {
-                FlushSettingsSave();
-                ReleasePreviewPipeline();
-                PreviewImage.Source = null;
-                PreviewImage.Visibility = Visibility.Collapsed;
-                Hide();
-                ShowInTaskbar = false;
-            }
+            if (WindowState == WindowState.Minimized && !_isExiting)
+                HideToTray();
         }
 
-        /// <summary>
-        /// Silent-boot completion: the HWND now exists but has not been
-        /// presented, so hiding here starts Intonaco straight in the tray with
-        /// the wallpaper already playing and no window flash.
-        /// </summary>
-        private void OnStartMinimizedSourceInitialized(object? sender, EventArgs e)
+        private void HideToTray()
         {
-            SourceInitialized -= OnStartMinimizedSourceInitialized;
-            _startMinimized = false;
-            // Hide before the first paint without storing WindowState.Minimized.
-            // Explicit restore must start from a clean WindowState.Normal.
-            ShowInTaskbar = false;
+            FlushSettingsSave();
+            ReleasePreviewPipeline();
+            PreviewImage.Source = null;
+            PreviewImage.Visibility = Visibility.Collapsed;
+
+            // Reset Minimized only AFTER hiding. A lingering minimized HWND
+            // forces a second click on the desktop shortcut before it paints.
             Hide();
-            DebugLog.Write("Start minimized: window suppressed, running from the tray.");
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+            ShowInTaskbar = false;
         }
 
-        private void OnWindowClosing(object? sender, CancelEventArgs e)
+         private void OnWindowClosing(object? sender, CancelEventArgs e)
         {
             FlushSettingsSave();
 
             if (!_isExiting)
             {
-                // Minimize to tray instead of closing
+                // Close means tray. Avoid sending the HWND through a
+                // visible minimized state that can break the first restore.
                 e.Cancel = true;
-                WindowState = WindowState.Minimized;
+                HideToTray();
                 return;
             }
 
@@ -2365,36 +2358,67 @@ namespace Intonaco.Views
             if (_isExiting)
                 return;
 
-            // Queue an existing-instance request behind layout and any
-            // in-flight minimize/close events. This handles desktop shortcut
-            // and Start menu launches the same way as the working tray action.
-            Dispatcher.BeginInvoke(DispatcherPriority.Background, (Action)ShowMainWindow);
+            if (!_firstContentRendered)
+            {
+                // A shortcut invoked while sign-in is still rendering should
+                // cancel silent startup and show the fully painted controls.
+                _pendingWindowRestore = true;
+                return;
+            }
+
+            // Input priority processes a deliberate user launch promptly
+            // instead of waiting behind background wallpaper maintenance.
+            Dispatcher.BeginInvoke(DispatcherPriority.Input,
+                (Action)ShowMainWindow);
         }
+
+        private const int SwRestore = 9;
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         private void ShowMainWindow()
         {
             if (_isExiting)
                 return;
 
-            // IMPORTANT: WPF must not Show() while WindowState is Minimized.
-            // Showing first can re-hide the HWND through StateChanged and leave
-            // a black / inactive window. Restore the state before showing.
-            ShowActivated = true;
-            WindowState = WindowState.Normal;
-            ShowInTaskbar = true;
-            Show();
-            Activate();
+            if (!_firstContentRendered)
+            {
+                _pendingWindowRestore = true;
+                return;
+            }
 
-            // A minimized startup window or a second-instance signal can
-            // arrive before first layout. Refresh after the restored HWND has
-            // completed layout and is ready to paint.
+            ShowActivated = true;
+            ShowInTaskbar = true;
+            Opacity = 1;
+            WindowState = WindowState.Normal;
+            if (!IsVisible)
+                Show();
+
+            // The secondary process is foreground-eligible from a desktop
+            // shortcut. Restore the native HWND as well as the WPF state,
+            // otherwise the first activation can remain behind the taskbar.
+            IntPtr hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                ShowWindowAsync(hwnd, SwRestore);
+                SetForegroundWindow(hwnd);
+            }
+            Activate();
+            Focus();
+
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)(() =>
             {
                 if (_isExiting || !IsVisible || WindowState == WindowState.Minimized)
                     return;
-                Activate();
-                Focus();
+                InvalidateMeasure();
                 InvalidateVisual();
+                UpdateLayout();
                 RefreshPreviewForCurrentState();
                 UpdateSeekTimer();
             }));
