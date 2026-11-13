@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Intonaco.Core;
 using Xunit;
@@ -35,6 +36,45 @@ namespace Intonaco.Tests
             Assert.Equal("Native", AppSettings.NormalizeBackend("Native"));
             Assert.Equal("Windows", AppSettings.NormalizeBackend("Windows"));
             Assert.Equal("MPV", AppSettings.NormalizeBackend("MPV"));
+        }
+
+        [Fact]
+        public void DeepPauseNativeTelemetry_KeepsCorrect64BitAbi()
+        {
+            var stats = typeof(GpuVideoWallpaperPlayer).GetNestedType(
+                "Stats", BindingFlags.NonPublic);
+            Assert.NotNull(stats);
+            Assert.Equal(48, Marshal.SizeOf(stats!));
+            Assert.Equal((IntPtr)20,
+                Marshal.OffsetOf(stats!, "DecoderSleeping"));
+            Assert.Equal((IntPtr)24,
+                Marshal.OffsetOf(stats!, "DurationSeconds"));
+        }
+
+        [Fact]
+        public void DeepPause_ReleasesVideoDecoderButKeepsDxgiStillFrame()
+        {
+            string? source = null;
+            for (var folder = new DirectoryInfo(AppContext.BaseDirectory);
+                 folder != null; folder = folder.Parent)
+            {
+                string path = Path.Combine(folder.FullName,
+                    "native", "IntonacoVideo", "engine.cpp");
+                if (File.Exists(path))
+                {
+                    source = File.ReadAllText(path);
+                    break;
+                }
+            }
+
+            Assert.NotNull(source);
+            Assert.Contains("DeepPauseDelay", source!);
+            Assert.Contains("player->Shutdown()", source!);
+            Assert.Contains("player.Reset()", source!);
+            Assert.Contains("s->decoderSleeping.store(1)", source!);
+            Assert.Contains("resumeNeedsSeek", source!);
+            Assert.Contains("generation_ != s_->generation.load", source!);
+            Assert.DoesNotContain("EmptyWorkingSet", source!);
         }
 
         [Fact]
