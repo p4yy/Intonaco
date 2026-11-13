@@ -248,8 +248,15 @@ namespace Intonaco.Core
                 // Prefer modern libplacebo color conversion and HDR tone mapping.
                 // Fall back to the legacy GPU renderer on older mpv builds.
                 "--hwdec=auto-safe", "--vo=gpu-next,gpu", "--interpolation=no",
-                "--demuxer-readahead-secs=2",
-                "--demuxer-max-bytes=16MiB",
+                // Wallpapers play from local disk. Bound packet buffers without
+                // reducing frame resolution or bit depth; the video decoder
+                // retains whatever surfaces it needs for smooth playback.
+                "--demuxer-readahead-secs=1",
+                "--demuxer-max-bytes=8MiB",
+                "--demuxer-max-back-bytes=2MiB",
+                // A muted wallpaper needs no audio decoder. Unmuting can
+                // select the default audio track through the IPC connection.
+                "--aid=" + (_isMuted ? "no" : "auto"),
                 "--wid=" + unchecked((uint)_host.Handle.ToInt64())
                     .ToString(CultureInfo.InvariantCulture),
                 "--input-ipc-server=\\\\.\\pipe\\" + name,
@@ -338,6 +345,10 @@ namespace Intonaco.Core
                 await SendAsync(new object[] { "observe_property", 3, "pause" });
                 await SendAsync(new object[] { "get_property", "duration" });
                 await SendAsync(new object[] { "get_property", "video-params" });
+                // Mute may have changed before the IPC connection was ready.
+                // Keep the selected audio track in sync with the UI.
+                await SendAsync(new object[] { "set_property", "aid",
+                    _isMuted ? "no" : "auto" });
                 // The wallpaper can be paused by system focus policy before
                 // the named pipe is ready; mirror state once connected.
                 await SendAsync(new object[] { "set_property", "pause",
@@ -601,7 +612,25 @@ namespace Intonaco.Core
         public void SetMute(bool muted)
         {
             _isMuted = muted;
+            // mpv can discard the audio decoder for silent wallpapers.
+            // Re-select a track before unmuting, without restarting video.
+            Send("set_property", "aid", muted ? "no" : "auto");
             Send("set_property", "mute", muted);
+        }
+
+        internal long HelperWorkingSetBytes
+        {
+            get
+            {
+                try
+                {
+                    _process?.Refresh();
+                    return _process?.HasExited == false
+                        ? _process.WorkingSet64 : 0;
+                }
+                catch (InvalidOperationException) { return 0; }
+                catch (Win32Exception) { return 0; }
+            }
         }
 
         public void ToggleMute() => SetMute(!_isMuted);
