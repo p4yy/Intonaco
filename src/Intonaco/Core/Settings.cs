@@ -23,6 +23,8 @@ namespace Intonaco.Core
         public double Volume { get; set; } = 0.0;
         public int TargetFps { get; set; } = 30;
         public string PlaybackBackend { get; set; } = "Windows"; // "Windows" or "MPV"
+        // Optional user-selected mpv.exe: Intonaco never bundles or downloads it.
+        public string? MpvExecutablePath { get; set; }
         public string WallpaperFit { get; set; } = "Fill"; // "Fill", "Fit", "Stretch"
         public double PlaybackSpeed { get; set; } = 1.0;
         public bool LoopPlayback { get; set; } = true;
@@ -106,6 +108,8 @@ namespace Intonaco.Core
                 : Math.Clamp(PlaybackSpeed, 0.25, 2.0);
             WallpaperFit = NormalizeFit(WallpaperFit);
             PlaybackBackend = NormalizeBackend(PlaybackBackend);
+            MpvExecutablePath = string.IsNullOrWhiteSpace(MpvExecutablePath)
+                ? null : MpvExecutablePath.Trim();
             BackgroundAnimationMode = NormalizeBackgroundAnimationMode(BackgroundAnimationMode);
 
             // The new mode is the single source of truth. Keep the two legacy
