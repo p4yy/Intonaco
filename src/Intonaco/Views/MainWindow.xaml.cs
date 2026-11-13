@@ -170,6 +170,7 @@ namespace Intonaco.Views
         private static IWallpaperPlayer CreatePlayer(string backend) =>
             AppSettings.NormalizeBackend(backend) switch
             {
+                "GPU" => new GpuVideoWallpaperPlayer(),
                 "MPV" => new MpvWallpaperPlayer(),
                 "Windows" => new WallpaperPlayer(),
                 _ => new NativeMfPlayWallpaperPlayer()
@@ -209,8 +210,10 @@ namespace Intonaco.Views
             FpsComboBox.IsEnabled = false;
             FpsComboBox.ToolTip =
                 "Video plays at its original frame rate. Changing an FPS limit is unavailable in this renderer.";
-            PreviewHintText.Text = _player is NativeMfPlayWallpaperPlayer
-                ? "Built-in native playback — no external player or extra preview decoder."
+            PreviewHintText.Text = _player is GpuVideoWallpaperPlayer
+                ? "Intonaco GPU — hardware decoding and direct DXGI presentation."
+                : _player is NativeMfPlayWallpaperPlayer
+                    ? "Built-in native playback — no external player or extra preview decoder."
                 : mpv
                     ? "Optional MPV renders without a second in-app decoder."
                     : "Drop a video here or choose a file";
@@ -370,7 +373,8 @@ namespace Intonaco.Views
                 // GC or opening an extra decoder. Logs show whether the heavy
                 // RAM is in managed objects, native Media Foundation or mpv.
                 RuntimeMemoryDiagnostics.LogIfDue(
-                    _player is MpvWallpaperPlayer ? "MPV" :
+                    _player is GpuVideoWallpaperPlayer ? "GPU-DirectX" :
+                        _player is MpvWallpaperPlayer ? "MPV" :
                         _player is NativeMfPlayWallpaperPlayer ? "Native" : "Windows",
                     _livePreviewEnabled && PreviewMedia.Source != null,
                     _player.NaturalVideoWidth, _player.NaturalVideoHeight,
@@ -1057,7 +1061,7 @@ namespace Intonaco.Views
             ++_previewThumbnailVersion;
             PreviewModeButton.Content = "Play live preview";
             PreviewModeButton.Visibility = _player is MpvWallpaperPlayer
-                or NativeMfPlayWallpaperPlayer
+                or NativeMfPlayWallpaperPlayer or GpuVideoWallpaperPlayer
                 ? Visibility.Collapsed : Visibility.Visible;
             RefreshPreviewForCurrentState();
         }
@@ -1089,7 +1093,8 @@ namespace Intonaco.Views
         {
             // Shell thumbnails also work when the desktop uses MPV;
             // never start an additional Windows video decoder for MPV files.
-            if (_player is MpvWallpaperPlayer or NativeMfPlayWallpaperPlayer)
+            if (_player is MpvWallpaperPlayer or NativeMfPlayWallpaperPlayer
+                or GpuVideoWallpaperPlayer)
             {
                 _livePreviewEnabled = false;
                 PreviewModeButton.Visibility = Visibility.Collapsed;
@@ -1238,7 +1243,8 @@ namespace Intonaco.Views
         private void OnToggleLivePreview(object sender, RoutedEventArgs e)
         {
             if (_previewFilePath == null ||
-                _player is MpvWallpaperPlayer or NativeMfPlayWallpaperPlayer)
+                _player is MpvWallpaperPlayer or NativeMfPlayWallpaperPlayer
+                    or GpuVideoWallpaperPlayer)
                 return;
 
             if (!_livePreviewEnabled && IsOptionalPreviewOverBudget())
