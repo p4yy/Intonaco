@@ -261,8 +261,8 @@ namespace Intonaco.Core
                     {
                         _mediaOpened = true;
                         DebugLog.Write(
-                            $"GPU video loaded: {s.Width}x{s.Height}, D3D11 hardware={s.GpuDecode != 0}, " +
-                            $"frame count={s.FramesPresented}; native frame server and limited surface queue.");
+                            $"GPU video loaded: {s.Width}x{s.Height}, D3D11 GPU device active={s.GpuDecode != 0}, " +
+                            $"frame count={s.FramesPresented}; actual hardware decoder selection is driver-dependent.");
                         MediaOpened?.Invoke(Duration);
                     }
                 }
@@ -311,8 +311,9 @@ namespace Intonaco.Core
             if (seconds < 15)
                 return;
 
-            double presentedFps = Math.Max(0,
-                stats.FramesPresented - _telemetryStartFrames) / seconds;
+            long presentedDelta = Math.Max(0,
+                stats.FramesPresented - _telemetryStartFrames);
+            double presentedFps = presentedDelta / seconds;
             _telemetryStartTicks = now;
             _telemetryStartFrames = stats.FramesPresented;
 
@@ -320,6 +321,12 @@ namespace Intonaco.Core
             {
                 using Process process = Process.GetCurrentProcess();
                 process.Refresh();
+                if (!decoderSleeping && !_pauseRequested &&
+                    presentedDelta == 0)
+                {
+                    DebugLog.Write("GPU warning: no new frame presented for 15 seconds " +
+                        "while playback is requested. Check the Windows video decoder.");
+                }
                 DebugLog.Write("GPU playback sample: " +
                     "phase=" + (decoderSleeping ? "deep-paused" :
                         _pauseRequested ? "paused" : "playing") +
