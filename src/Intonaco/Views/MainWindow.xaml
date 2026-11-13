@@ -664,8 +664,8 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="Frame rate" Style="{StaticResource SettingTitleText}" />
-                                <TextBlock Text="Preferred playback frame rate"
+                                <TextBlock Text="Frame rate (source controlled)" Style="{StaticResource SettingTitleText}" />
+                                <TextBlock Text="Plays at the video's original frame rate"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
 
