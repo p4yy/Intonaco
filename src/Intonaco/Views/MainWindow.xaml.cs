@@ -1178,6 +1178,14 @@ namespace Intonaco.Views
                     : "Wallpaper plays on your desktop";
             }
 
+            // Explorer thumbnail providers can load a full 4K decoder
+            // transiently inside our process, even when the 480x270 image
+            // is never seen. Never make that request while Intonaco is in
+            // the tray or inactive: load only when the settings UI is open.
+            // Activation already calls RefreshPreviewForCurrentState().
+            if (!IsPreviewWindowVisible)
+                return;
+
             if (!string.Equals(_thumbnailRequestedFor, _previewFilePath,
                 StringComparison.OrdinalIgnoreCase))
             {
