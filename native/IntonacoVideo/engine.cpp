@@ -39,6 +39,7 @@ namespace
     struct SharedState
     {
         std::atomic<bool> stop{false};
+        std::atomic<bool> finished{false};
         std::atomic<bool> pause{false};
         std::atomic<bool> mute{true};
         std::atomic<bool> loop{true};
@@ -151,9 +152,17 @@ namespace
         std::shared_ptr<SharedState> state = std::make_shared<SharedState>();
         std::thread worker;
 
-        void Run() noexcept
+        // All inputs are owned by the worker, not by the Engine wrapper.
+        // This permits a bounded shutdown when a GPU driver stalls in Present:
+        // the UI can release the wrapper without any use-after-free.
+        static void Run(std::shared_ptr<SharedState> s,
+                        HWND hwnd, std::wstring url) noexcept
         {
-            const auto s = state;
+            struct Completion
+            {
+                std::shared_ptr<SharedState> s;
+                ~Completion() { s->finished.store(true, std::memory_order_release); }
+            } completion{s};
             const HRESULT co = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
             const bool uninitializeCo = SUCCEEDED(co);
             bool startedMf = false;
@@ -453,7 +462,14 @@ extern "C"
             auto engine = std::make_unique<Engine>();
             engine->hwnd = window;
             engine->url = url;
-            engine->worker = std::thread([p = engine.get()] { p->Run(); });
+            // Copy the state, URL and target HWND into the thread. Never
+            // capture the Engine object itself, which may be destroyed while
+            // a faulty video driver is still processing its final Present.
+            engine->worker = std::thread(
+                [state = engine->state, hwnd = engine->hwnd, url = engine->url]()
+                {
+                    Engine::Run(state, hwnd, url);
+                });
             *handle = engine.release();
             return S_OK;
         }
@@ -500,6 +516,15 @@ extern "C"
         std::unique_ptr<Engine> engine(static_cast<Engine*>(handle));
         engine->state->stop.store(true, std::memory_order_release);
         if (engine->worker.joinable())
-            engine->worker.join();
+        {
+            // A hung graphics driver must not lock the Intonaco UI forever.
+            // The worker owns all its state and can finish cleanup later.
+            HANDLE threadHandle = static_cast<HANDLE>(engine->worker.native_handle());
+            DWORD result = WaitForSingleObject(threadHandle, 1500);
+            if (result == WAIT_OBJECT_0)
+                engine->worker.join();
+            else
+                engine->worker.detach();
+        }
     }
 }
