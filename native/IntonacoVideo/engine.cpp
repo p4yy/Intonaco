@@ -18,6 +18,7 @@
 #include <thread>
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 using Microsoft::WRL::ComPtr;
 
@@ -36,6 +37,10 @@ namespace
         double position;
         long long frames;
     };
+
+    // C++ and .NET must agree on this fixed native telemetry layout.
+    static_assert(sizeof(VideoStats) == 48);
+    static_assert(offsetof(VideoStats, duration) == 24);
 
     struct SharedState
     {
