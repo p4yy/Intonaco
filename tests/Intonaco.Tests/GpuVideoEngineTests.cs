@@ -193,13 +193,20 @@ namespace Intonaco.Tests
             }
 
             Assert.NotNull(engine);
-            int shutdown = engine!.IndexOf("player->Shutdown();\n                            player.Reset();");
-            int clear = engine.IndexOf("context->ClearState();", shutdown);
+            // Windows CI checks out .cpp with CRLF; locate the actual
+            // deep-pause section instead of matching platform-specific EOLs.
+            int deepPause = engine!.IndexOf(
+                "// Invalidate callback events before shutdown.");
+            Assert.True(deepPause >= 0);
+            int shutdown = engine.IndexOf("player->Shutdown();", deepPause);
+            int decoderReset = engine.IndexOf("player.Reset();", shutdown);
+            int clear = engine.IndexOf("context->ClearState();", decoderReset);
             int flush = engine.IndexOf("context->Flush();", clear);
             int trim = engine.IndexOf("idleDxgiDevice->Trim();", flush);
             int retained = engine.IndexOf("s->decoderSleeping.store(1)", trim);
-            Assert.True(shutdown > 0 && clear > shutdown && flush > clear
-                && trim > flush && retained > trim);
+            Assert.True(shutdown > deepPause && decoderReset > shutdown &&
+                clear > decoderReset && flush > clear &&
+                trim > flush && retained > trim);
             Assert.Equal(1, engine.Split("idleDxgiDevice->Trim();").Length - 1);
             Assert.Contains("DXGI_MEMORY_SEGMENT_GROUP_LOCAL", engine);
             Assert.Contains("DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL", engine);
