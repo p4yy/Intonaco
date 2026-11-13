@@ -40,6 +40,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Build Intonaco native GPU renderer (x64, no external app)
+        shell: pwsh
+        run: ./tools/Build-NativeVideo.ps1
+
       - name: Restore Store build
         run: dotnet restore src/Intonaco/Intonaco.csproj /p:StoreBuild=true
       - name: Publish Store app
