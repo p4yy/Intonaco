@@ -31,6 +31,7 @@ namespace
         int gpuDecode;   // 1=real D3D11 hardware device + DXGI manager
         int width;
         int height;
+        int decoderSleeping; // 1=Media Foundation decoder released; frozen DXGI frame retained
         double duration;
         double position;
         long long frames;
@@ -50,6 +51,9 @@ namespace
         std::atomic<bool> ended{false};
         std::atomic<int> phase{0};
         std::atomic<int> error{0};
+        std::atomic<int> generation{0};
+        std::atomic<int> decoderSleeping{0};
+        std::atomic<bool> seeked{false};
         std::atomic<int> gpu{0};
         std::atomic<int> width{0}, height{0};
         std::atomic<double> volume{0}, speed{1}, duration{0}, position{0}, seekTo{0};
@@ -62,8 +66,10 @@ namespace
     {
         std::atomic<ULONG> refs_{1};
         std::shared_ptr<SharedState> s_;
+        int generation_;
     public:
-        explicit Notify(std::shared_ptr<SharedState> s) : s_(std::move(s)) {}
+        Notify(std::shared_ptr<SharedState> s, int generation)
+            : s_(std::move(s)), generation_(generation) {}
 
         STDMETHODIMP QueryInterface(REFIID id, void** output) override
         {
@@ -88,7 +94,11 @@ namespace
 
         STDMETHODIMP EventNotify(DWORD evt, DWORD_PTR p1, DWORD) override
         {
-            if (s_->stop.load()) return S_OK;
+            // Ignore asynchronous events from a decoder that has already
+            // been shut down for the paused still-frame state.
+            if (s_->stop.load() ||
+                generation_ != s_->generation.load(std::memory_order_acquire))
+                return S_OK;
             switch (evt)
             {
                 case MF_MEDIA_ENGINE_EVENT_LOADEDMETADATA:
@@ -96,6 +106,9 @@ namespace
                     break;
                 case MF_MEDIA_ENGINE_EVENT_CANPLAY:
                     s_->canPlay.store(true);
+                    break;
+                case MF_MEDIA_ENGINE_EVENT_SEEKED:
+                    s_->seeked.store(true);
                     break;
                 case MF_MEDIA_ENGINE_EVENT_ENDED:
                     s_->ended.store(true);
@@ -235,12 +248,9 @@ namespace
                         dxgiManager.Get());
                     if (FAILED(hr)) { fail(hr); goto done; }
 
-                    ComPtr<IMFMediaEngineNotify> notify;
-                    notify.Attach(new (std::nothrow) Notify(s));
-                    if (!notify) { fail(E_OUTOFMEMORY); goto done; }
-                    hr = attrs->SetUnknown(MF_MEDIA_ENGINE_CALLBACK, notify.Get());
-                    if (FAILED(hr)) { fail(hr); goto done; }
-
+                    // The frame-server session is created separately from the
+                    // D3D11 device and swap chain. A long pause can release the
+                    // decoder, while DWM retains the last presented GPU frame.
                     ComPtr<IMFMediaEngineClassFactory> classFactory;
                     hr = CoCreateInstance(CLSID_MFMediaEngineClassFactory,
                         nullptr, CLSCTX_INPROC_SERVER,
@@ -248,17 +258,57 @@ namespace
                     if (FAILED(hr)) { fail(hr); goto done; }
 
                     ComPtr<IMFMediaEngine> player;
-                    hr = classFactory->CreateInstance(MF_MEDIA_ENGINE_REAL_TIME_MODE,
-                        attrs.Get(), &player);
-                    if (FAILED(hr)) { fail(hr); goto done; }
+                    const auto openMediaSession = [&]() -> HRESULT
+                    {
+                        // Reset events before registering a new callback;
+                        // generations make stale asynchronous events harmless.
+                        s->loaded.store(false);
+                        s->canPlay.store(false);
+                        s->seeked.store(false);
+                        s->ended.store(false);
+                        int session = ++s->generation;
+                        ComPtr<IMFMediaEngineNotify> notify;
+                        notify.Attach(new (std::nothrow) Notify(s, session));
+                        if (!notify) return E_OUTOFMEMORY;
+                        HRESULT result = attrs->SetUnknown(
+                            MF_MEDIA_ENGINE_CALLBACK, notify.Get());
+                        if (FAILED(result)) return result;
+                        result = classFactory->CreateInstance(
+                            MF_MEDIA_ENGINE_REAL_TIME_MODE,
+                            attrs.Get(), &player);
+                        if (FAILED(result)) return result;
+                        BSTR source = SysAllocString(url.c_str());
+                        if (!source)
+                        {
+                            player->Shutdown();
+                            player.Reset();
+                            return E_OUTOFMEMORY;
+                        }
+                        result = player->SetSource(source);
+                        SysFreeString(source);
+                        if (FAILED(result))
+                        {
+                            player->Shutdown();
+                            player.Reset();
+                            return result;
+                        }
+                        s->decoderSleeping.store(0);
+                        return S_OK;
+                    };
 
-                    BSTR source = SysAllocString(url.c_str());
-                    if (!source) { fail(E_OUTOFMEMORY); player->Shutdown(); goto done; }
-                    hr = player->SetSource(source);
-                    SysFreeString(source);
-                    if (FAILED(hr)) { fail(hr); player->Shutdown(); goto done; }
+                    hr = openMediaSession();
+                    if (FAILED(hr)) { fail(hr); goto done; }
+                    // 1 means a real hardware D3D11 device is bound to the
+                    // Media Engine. Driver-level Video Decode (not just 3D)
+                    // must still be checked in Task Manager.
                     s->gpu.store(1);
 
+                    constexpr auto DeepPauseDelay = std::chrono::milliseconds(1800);
+                    std::chrono::steady_clock::time_point pausedAt{};
+                    std::chrono::steady_clock::time_point seekStarted{};
+                    double frozenPosition = 0.0;
+                    bool resumeNeedsSeek = false;
+                    bool resumeSeekIssued = false;
                     bool begun = false;
                     bool lastPause = false;
                     bool lastMute = false;
