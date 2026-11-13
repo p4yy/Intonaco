@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -58,6 +59,58 @@ namespace Intonaco.Tests
             var settings = new AppSettings();
             Assert.Equal("Native", settings.PlaybackBackend);
             Assert.Null(settings.MpvExecutablePath);
+        }
+
+        [WpfFact]
+        public async Task NativePlayer_OpensAndPausesWithNoExternalApp()
+        {
+            // This fixture is generated locally by another regression test.
+            // It does not download a codec, executable or video.
+            string video = OptimizationTests.CreateSampleVideo();
+            if (Application.Current == null)
+                _ = new Application();
+
+            using var player = new NativeMfPlayWallpaperPlayer();
+            var window = new Window
+            {
+                Width = 480,
+                Height = 270,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.None,
+                Content = player.CreateHost()
+            };
+
+            var opened = new TaskCompletionSource<TimeSpan>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            player.MediaOpened += duration => opened.TrySetResult(duration);
+            player.ErrorOccurred += error =>
+                opened.TrySetException(new InvalidOperationException(error));
+
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                Assert.True(player.Play(video));
+
+                Task winner = await Task.WhenAny(
+                    opened.Task, Task.Delay(TimeSpan.FromSeconds(12)));
+                Assert.Same(opened.Task, winner);
+                await opened.Task;
+
+                Assert.True(player.NaturalVideoWidth > 0);
+                Assert.True(player.NaturalVideoHeight > 0);
+                Assert.Equal(WallpaperPlayer.PlaybackState.Playing, player.CurrentState);
+
+                player.Pause();
+                Assert.Equal(WallpaperPlayer.PlaybackState.Paused, player.CurrentState);
+                player.Resume();
+                Assert.Equal(WallpaperPlayer.PlaybackState.Playing, player.CurrentState);
+            }
+            finally
+            {
+                player.Stop();
+                window.Close();
+            }
         }
 
         [WpfFact]
