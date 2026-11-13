@@ -245,9 +245,12 @@ namespace Intonaco.Core
                 "--no-config", "--no-terminal", "--no-border",
                 "--no-osc", "--osd-level=0", "--force-window=yes",
                 "--keep-open=yes", "--input-default-bindings=no",
-                // Prefer modern libplacebo color conversion and HDR tone mapping.
-                // Fall back to the legacy GPU renderer on older mpv builds.
+                // Preserve source color metadata and map it to the display's
+                // calibrated ICC profile if available. Never fake contrast,
+                // brightness or saturation to hide a limited/full-range bug.
+                // Prefer libplacebo color management; legacy gpu fallback.
                 "--hwdec=auto-safe", "--vo=gpu-next,gpu", "--interpolation=no",
+                "--icc-profile-auto",
                 // Wallpapers play from local disk. Bound packet buffers without
                 // reducing frame resolution or bit depth; the video decoder
                 // retains whatever surfaces it needs for smooth playback.
