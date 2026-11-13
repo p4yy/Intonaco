@@ -149,6 +149,16 @@ jobs:
             throw
           }
 
+      - name: Package portable four-way benchmark toolkit
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/benchmark | Out-Null
+          Copy-Item tools/Compare-WallpaperPerformance.ps1,tools/Summarize-WallpaperBenchmarks.ps1,tools/Test-WallpaperBenchmarks.ps1 artifacts/benchmark/
+          Copy-Item docs/LIVE_WALLPAPER_HEAD_TO_HEAD.md artifacts/benchmark/README.md
+          if (-not (Test-Path artifacts/benchmark/Summarize-WallpaperBenchmarks.ps1)) {
+            throw 'Benchmark toolkit missing from downloadable artifact.'
+          }
+
       - name: Upload app artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -157,4 +167,5 @@ jobs:
             artifacts/framework-dependent
             artifacts/self-contained
             artifacts/installer/*.exe
+            artifacts/benchmark/*
           if-no-files-found: error
