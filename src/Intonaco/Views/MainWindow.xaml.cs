@@ -2264,9 +2264,15 @@ namespace Intonaco.Views
 
         private void OnMediaOpened(TimeSpan duration)
         {
+            // Decoder events are posted asynchronously. If the owner changes
+            // wallpaper before this callback reaches WPF, an old MediaOpened
+            // must not mark the *new* source as ready or trigger a second
+            // thumbnail extraction while the new GPU session is starting.
+            int requestVersion = _wallpaperRequestVersion;
             Dispatcher.BeginInvoke(() =>
             {
-                if (!_isApplied) return;
+                if (!_isApplied || requestVersion != _wallpaperRequestVersion)
+                    return;
 
                 // MediaElement can misinterpret broken MP4 pixel-aspect data:
                 // e.g. report 232x2160 for a genuine 3840x2160 video. Never
