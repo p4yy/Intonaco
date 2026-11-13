@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "src/Intonaco/Intonaco.csproj"
+      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 permissions:
@@ -137,6 +138,21 @@ jobs:
           }
           $checksums | Set-Content release/SHA256SUMS.txt -Encoding ascii
           Get-ChildItem release | Format-Table Name, Length
+
+      # This repository deliberately exposes a single stable release URL.
+      # On updates, action-gh-release replaces the binary assets but does not
+      # always advance an existing tag. Sync it explicitly so the public
+      # source snapshot and published 2.2.0 binaries refer to the same commit.
+      - name: Sync official release tag to approved main commit
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f Intonaco-Wallpaper "${{ github.sha }}"
+          git push --force origin refs/tags/Intonaco-Wallpaper
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Official release tag could not be advanced to the main commit.'
+          }
 
       - name: Publish one clean GitHub release
         uses: softprops/action-gh-release@v2
