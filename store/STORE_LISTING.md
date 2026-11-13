@@ -1,76 +1,45 @@
-# Intonaco Wallpaper — Microsoft Store listing copy
+# Intonaco Wallpaper — Microsoft Store listing reference
 
-This is a standalone Microsoft Store listing. It must **not** point users
-to the GitHub installer or require GitHub to install or update the app.
+This file records the submitted **v2.2.0** Store listing information. It is not a live Partner Center status feed.
 
 ## Product
-- **Reserved product name:** Intonaco Wallpaper (present in the supplied Partner Center product identity)
-- **Developer/publisher display:** Acev Apps Co. (exact Partner Center spelling; the existing GitHub EXE/installer metadata uses Acev Dev Co separately)
-- **Package Identity Name:** `AcevAppsCo.IntonacoWallpaper`
-- **Publisher DN:** `CN=44221EAF-7759-44DD-9DA8-F00E45DF7108`
-- **Store ID:** `9PBBDCR0C6LH`
-- **Category suggestion:** Personalization
-- **Platform:** Windows desktop, x64
-- **Application version:** 2.2.0.0 (Store MSIX, checked by Windows packaging workflow)
-- **Pricing:** Set explicitly in Partner Center; do not assume free
-- **Rating/content declaration:** Answer Partner Center's questionnaire accurately
-- **Privacy policy URL:** https://github.com/p4yy/Intonaco/blob/main/docs/PRIVACY.md (valid after the Store PR is merged)
-- **Support URL:** https://github.com/p4yy/Intonaco/issues
 
-## Short description
-Bring your desktop to life with video wallpapers.
+- **Reserved name:** Intonaco Wallpaper
+- **Publisher:** Acev Apps Co.
+- **Package identity:** `AcevAppsCo.IntonacoWallpaper`
+- **Store ID:** `9PBBDCR0C6LH`
+- **Package version:** `2.2.0.0`, Windows x64
+- **Category:** Personalization
+- **Pricing:** Free
+- **Distribution:** Public, worldwide markets
+- **Privacy policy:** https://github.com/p4yy/Intonaco/blob/main/docs/PRIVACY.md
+- **Support:** https://github.com/p4yy/Intonaco/issues
 
 ## Description
-**Intonaco Wallpaper** brings video wallpapers to your Windows desktop
-with a straightforward, native interface.
 
-Choose a video from your computer, preview it, and apply it behind your
-desktop icons. Adjust how it fits the screen, control playback, and
-keep your preferred setup between sessions.
+Intonaco Wallpaper puts your own videos behind the desktop icons on Windows 10 and 11.
+
+Choose a video from your computer, preview it, and apply it as your wallpaper. Adjust screen fit, playback speed, looping and volume, revisit recent wallpapers, and select your preferred automatic-pause behavior.
 
 **Features**
-- Play supported video files as desktop wallpapers.
-- A clean icon-led interface for choosing, managing and revisiting wallpapers.
-- Choose fit, playback speed, looping, mute, and volume. Play at the original source frame rate.
-- Conserve resources with integrated GPU playback and a deep-pause still frame; decide whether to pause when another app is active.
-- Resume your previous wallpaper and optionally start with Windows.
-- Explore popular independent wallpaper-video websites using copyable links.
+- Play supported local video files as Windows desktop wallpapers.
+- Integrated Direct3D 11 / Windows Media Foundation playback with compatibility options.
+- Play, pause, seek, loop, speed, fit and volume controls.
+- Resource-aware deep pause, optional startup restore and system tray access.
+- Copy links to independent wallpaper sources for use in your own browser.
 
-Intonaco Wallpaper uses local video files. The optional third-party catalog section
-copies website addresses to your clipboard; it doesn't fetch, scrape,
-automatically redirect, download, or distribute other creators' wallpapers.
-Third-party websites have their own licensing terms.
-
-Video formats, smoothness, and resource usage vary by Windows hardware,
-video codec and installed media capabilities. The integrated Intonaco GPU
-engine and Windows compatibility engines are included; no additional media
-player is needed. High-resolution H.264 sources may use additional RAM.
+The app doesn't bundle or automatically download external wallpapers. Video decoding, smoothness and memory use depend on the selected file, installed codecs and hardware.
 
 ## What's new in 2.2.0
-- Redesigned icon-led wallpaper library, playback settings and preferences.
-- Intonaco's integrated GPU video renderer is now the default.
-- Deep pause retains the last frame while releasing decoder resources.
-- Improved video switching and decoder handoff, with no overlapping GPU decoders.
-- Removed experimental labels and legacy external-player setup controls.
 
-## Store submission requirements
-1. The product identity was provided from Partner Center and is recorded in `store/partner-center-identity.json`.
-2. Run the separate **Store MSIX** workflow on the current branch; with blank overrides it uses the recorded real Partner Center identity, not a development-preview identity.
-3. Inspect the completed unsigned MSIX artifact and verify the manifest identity and company display name before attempting any submission.
-4. Do not confuse this unsigned package with the separately published GitHub installer or a Microsoft-certified Store release.
-6. Test the resulting package on Windows 10/11, especially startup,
-   single-instance shortcut activation, wallpaper playback, pause and tray.
-7. Add **real** 16:9 screenshots of the actual software using wallpapers
-   you are authorized to display, plus the exact official Intonaco app icon.
-8. Use the published privacy policy and support links above, then set markets,
-   category, pricing, age/content ratings and accessibility disclosures.
-9. Confirm that Store package certification passes before announcing availability.
+A refined native interface, the integrated GPU renderer as default, deep-pause decoder release, and improved wallpaper switching.
 
-**Provided from Partner Center:** Product name, package identity, publisher DN, publisher display and Store ID.
-**Still unverified:** Store certification, package signing/re-signing and physical Windows QA.
-The GitHub EXE/installer is not the Store submission.
+## Submission and media notes
 
-**Publisher note:** An Inno Setup `AppPublisher` value and executable Company
-metadata are NOT an Authenticode digital signature. Windows may show
-"Unknown publisher" until a valid publisher certificate is used. Store
-MSIX is re-signed as part of the Store certification process.
+The 2.2.0.0 MSIX package was submitted to Partner Center on **November 13, 2026**, and entered certification. Certification and public availability must be verified in Partner Center.
+
+Store screenshots should accurately represent the real app and use media cleared for promotional use. Do not substitute stylized or synthetic UI mockups for genuine application screenshots.
+
+The `.msixupload` is a Store submission artifact, not a downloadable consumer installer. The GitHub EXE and portable builds are separate unsigned distributions.
+
+See [submission record](SUBMIT_2_2_0.md), [privacy policy](../docs/PRIVACY.md), and [Store packaging guidance](../docs/MICROSOFT_STORE.md).
