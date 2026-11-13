@@ -4,6 +4,27 @@ All notable changes to Intonaco are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — 2026-11-13
+
+**Official Windows x64 release** — new GitHub release tag `v2.2.0`.
+
+### Playback and performance
+- Intonaco's integrated Direct3D 11 / Media Foundation GPU renderer is the default; no separate media player installation is needed.
+- Deep pause releases the decoder while preserving the final wallpaper image, with original video color and resolution.
+- Avoid overlapping 4K GPU decoders when switching files; reduce hidden thumbnail decoding and preserve responsiveness.
+- Adaptive frame polling and native GPU memory diagnostics for codec-specific troubleshooting.
+- Native and Windows compatibility modes remain available.
+
+### Interface and distribution
+- Refreshed wallpaper library and settings with clear icons for each section and control.
+- Removed the experimental player label and legacy external player setup control.
+- Setup EXE, portable Windows EXE and independent Microsoft Store `.msixupload` are published under a fresh versioned GitHub release.
+- Updated Store listing and official Partner Center package information.
+
+### Known limitations
+- Video playback smoothness and system/VRAM usage depend on the codec and GPU. Under 100 MB RAM and zero lag are not guaranteed for every 4K video.
+- GitHub executables are unsigned. The Microsoft Store package must be submitted for certification separately.
+
 ## [2.1.3] — Unreleased
 
 **Stability first.** This build is a testing candidate and has not been
