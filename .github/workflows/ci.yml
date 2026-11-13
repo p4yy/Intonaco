@@ -29,8 +29,19 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Build Intonaco native GPU renderer (x64, no external app)
+        shell: pwsh
+        run: ./tools/Build-NativeVideo.ps1
+
       - name: Restore
         run: dotnet restore Intonaco.sln
+
+      - name: Verify bundled GPU renderer exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path src/Intonaco/native/Intonaco.Video.dll)) {
+            throw 'Standalone native video module was not built.'
+          }
 
       - name: Build
         run: dotnet build Intonaco.sln -c Release --no-restore
