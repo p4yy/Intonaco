@@ -32,11 +32,13 @@ namespace Intonaco.Tests
         }
 
         [Theory]
-        [InlineData(null, "Native")]
-        [InlineData("", "Native")]
-        [InlineData("Invalid", "Native")]
-        [InlineData("MPV", "MPV")]
-        [InlineData("mpv", "MPV")]
+        [InlineData(null, "GPU")]
+        [InlineData("", "GPU")]
+        [InlineData("Invalid", "GPU")]
+        [InlineData("MPV", "GPU")]
+        [InlineData("mpv", "GPU")]
+        [InlineData("GPU", "GPU")]
+        [InlineData("gpu", "GPU")]
         [InlineData("Windows", "Windows")]
         [InlineData("Native", "Native")]
         [InlineData("native", "Native")]
@@ -46,21 +48,21 @@ namespace Intonaco.Tests
         }
 
         [Fact]
-        public void PlaybackBackend_DefaultsToBuiltInNativeEngine()
+        public void PlaybackBackend_DefaultsToBuiltInGpuEngine()
         {
             var settings = new AppSettings();
-            Assert.Equal("Native", settings.PlaybackBackend);
+            Assert.Equal("GPU", settings.PlaybackBackend);
             var normalized = AppSettings.LoadFromJson(
                 "{\"playbackBackend\":\"unknown\"}");
-            Assert.Equal("Native", normalized.PlaybackBackend);
+            Assert.Equal("GPU", normalized.PlaybackBackend);
         }
 
         [Fact]
-        public void PlaybackBackend_PersistsOptionalMpvChoice()
+        public void PlaybackBackend_MigratesLegacyMpvToBuiltInGpu()
         {
             var settings = AppSettings.LoadFromJson(
                 "{\"playbackBackend\":\"MPV\"}");
-            Assert.Equal("MPV", settings.PlaybackBackend);
+            Assert.Equal("GPU", settings.PlaybackBackend);
         }
 
         [Fact]
