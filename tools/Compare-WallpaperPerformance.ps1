@@ -5,6 +5,9 @@
 #
 # .\tools\Compare-WallpaperPerformance.ps1 -App Lively -OutputCsv lively.csv
 # .\tools\Compare-WallpaperPerformance.ps1 -App Intonaco -OutputCsv intonaco.csv
+# .\tools\Compare-WallpaperPerformance.ps1 -App AutoWall -OutputCsv autowall.csv
+# Test apps separately with identical videos; do not run both wallpaper
+# engines at once because one may be paused/obscured by the other.
 #
 # Includes named Lively helpers (e.g. Lively.Watchdog) and child processes
 # such as mpv, rather than comparing only the GUI processes. GPU Video Decode,
@@ -14,7 +17,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Intonaco', 'Lively')]
+    [ValidateSet('Intonaco', 'Lively', 'AutoWall')]
     [string]$App,
     [ValidateRange(5, 3600)]
     [int]$DurationSeconds = 30,
@@ -38,8 +41,14 @@ function Get-AppProcessSnapshot {
     foreach ($item in $items) {
         $isRoot = if ($Name -eq 'Intonaco') {
             $item.Name -ieq 'Intonaco.exe'
-        } else {
+        } elseif ($Name -eq 'Lively') {
             $item.Name -like 'Lively*'
+        } else {
+            # AutoWall ships under different versioned EXE names. Some
+            # editions launch weebp, mpv, or Chromium helpers beneath it.
+            # Include descendants without counting unrelated mpv windows.
+            $item.Name -like 'AutoWall*' -or
+            $item.Name -like 'weebp*'
         }
         if ($isRoot) {
             [void]$ids.Add([int]$item.ProcessId)
@@ -139,7 +148,7 @@ $cpu = $samples | Measure-Object CpuPercent -Average -Maximum
     PeakCpuPercent = [math]::Round($cpu.Maximum, 2)
     RamTargetMiB = $RamTargetMiB
     PeakTotalRamWithinTarget = ($ram.Maximum -lt $RamTargetMiB)
-    Note = 'Includes helpers and subprocesses; GPU memory/decode must be checked separately.'
+    Note = 'Includes app helpers and descendants; benchmark only one wallpaper engine at a time. Track GPU Video Decode/3D and dedicated GPU memory separately.'
 } | Format-List
 
 if ($EnforceRamTarget -and $ram.Maximum -ge $RamTargetMiB) {
