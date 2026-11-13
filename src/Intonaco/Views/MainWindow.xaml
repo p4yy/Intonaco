@@ -99,9 +99,18 @@
             <StackPanel Margin="28,4,28,24" MaxWidth="1060" HorizontalAlignment="Stretch">
 
                 <!-- Wallpaper -->
-                <TextBlock Text="Now playing"
-                           Style="{StaticResource SectionTitleText}"
-                           Margin="0,0,0,8" />
+<StackPanel Orientation="Horizontal" Margin="0,0,0,9" >
+                    <Border Width="30" Height="30"
+                            CornerRadius="9"
+                            Background="{DynamicResource SubtleBackgroundBrush}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="&#xE714;" Style="{StaticResource SectionGlyphText}" />
+                    </Border>
+                    <TextBlock Text="Now playing"
+                               Style="{StaticResource SectionTitleText}"
+                               Margin="10,0,0,0"
+                               VerticalAlignment="Center" />
+                </StackPanel>
 
                 <Border Style="{StaticResource CardBorder}" Padding="0" ClipToBounds="True">
                     <StackPanel>
@@ -235,12 +244,21 @@
 
                             <Button Grid.Column="2"
                                     x:Name="ChooseFileButton"
-                                    Content="Choose video"
                                     Style="{StaticResource AccentButton}"
                                     Click="OnChooseFile"
                                     MinWidth="112"
                                     Height="32"
-                                    VerticalAlignment="Center" />
+                                    VerticalAlignment="Center"
+                                    ToolTip="Choose a local video to make your desktop wallpaper">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE8E5;"
+                                               FontFamily="{StaticResource IconFont}"
+                                               FontSize="14"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="Choose video" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
 
                         <!-- Seek is only sampled while this window is visible.
@@ -348,10 +366,18 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0"
-                               Text="Your wallpapers"
+<StackPanel Orientation="Horizontal" Margin="0" Grid.Column="0">
+                    <Border Width="30" Height="30"
+                            CornerRadius="9"
+                            Background="{DynamicResource SubtleBackgroundBrush}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="&#xE8B9;" Style="{StaticResource SectionGlyphText}" />
+                    </Border>
+                    <TextBlock Text="Your wallpapers"
                                Style="{StaticResource SectionTitleText}"
+                               Margin="10,0,0,0"
                                VerticalAlignment="Center" />
+                </StackPanel>
 
                     <Button Grid.Column="1"
                             x:Name="ClearRecentsButton"
@@ -393,14 +419,14 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
 
-                                            <TextBlock Grid.Column="0"
-                                                       Text="&#xE714;"
-                                                       FontFamily="{StaticResource IconFont}"
-                                                       FontSize="18"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                                       Width="30"
-                                                       TextAlignment="Center"
-                                                       VerticalAlignment="Center" />
+                                            <Border Grid.Column="0" Width="36" Height="36"
+                                    CornerRadius="9"
+                                    Background="{DynamicResource SubtleBackgroundBrush}"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="&#xE8B9;"
+                                           Style="{StaticResource SectionGlyphText}"
+                                           FontSize="17" />
+                            </Border>
 
                                             <StackPanel Grid.Column="1" Margin="6,0" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding FileName}"
@@ -445,12 +471,23 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Get live wallpapers"
-                                               Style="{StaticResource SettingTitleText}" />
-                                    <TextBlock Text="Find a video, copy its source, then add the downloaded file"
-                                               Style="{StaticResource SettingDescriptionText}"
-                                               TextWrapping="Wrap" />
+                                <StackPanel Grid.Column="0"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <Border Width="32" Height="32" CornerRadius="9"
+                                            Background="{DynamicResource SubtleBackgroundBrush}"
+                                            Margin="0,0,12,0">
+                                        <TextBlock Text="&#xE774;"
+                                                   Style="{StaticResource SectionGlyphText}" />
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Discover wallpapers"
+                                                   Style="{StaticResource SettingTitleText}"
+                                                   FontWeight="SemiBold" />
+                                        <TextBlock Text="Copy sources for downloadable wallpaper videos"
+                                                   Style="{StaticResource SettingDescriptionText}"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
                                 </StackPanel>
                                 <TextBlock x:Name="WallpaperSourcesChevron"
                                            Grid.Column="1"
@@ -575,9 +612,18 @@
                 </Border>
 
                 <!-- Playback -->
-                <TextBlock Text="Playback settings"
-                           Style="{StaticResource SectionTitleText}"
-                           Margin="0,24,0,8" />
+<StackPanel Orientation="Horizontal" Margin="0,24,0,9" >
+                    <Border Width="30" Height="30"
+                            CornerRadius="9"
+                            Background="{DynamicResource SubtleBackgroundBrush}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="&#xE768;" Style="{StaticResource SectionGlyphText}" />
+                    </Border>
+                    <TextBlock Text="Playback settings"
+                               Style="{StaticResource SectionTitleText}"
+                               Margin="10,0,0,0"
+                               VerticalAlignment="Center" />
+                </StackPanel>
 
                 <Border Style="{StaticResource CardBorder}" Padding="0">
                     <StackPanel>
@@ -748,9 +794,18 @@
                 </Border>
 
                 <!-- General -->
-                <TextBlock Text="Preferences"
-                           Style="{StaticResource SectionTitleText}"
-                           Margin="0,24,0,8" />
+<StackPanel Orientation="Horizontal" Margin="0,24,0,9" >
+                    <Border Width="30" Height="30"
+                            CornerRadius="9"
+                            Background="{DynamicResource SubtleBackgroundBrush}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="&#xE713;" Style="{StaticResource SectionGlyphText}" />
+                    </Border>
+                    <TextBlock Text="Preferences"
+                               Style="{StaticResource SectionTitleText}"
+                               Margin="10,0,0,0"
+                               VerticalAlignment="Center" />
+                </StackPanel>
 
                 <Border Style="{StaticResource CardBorder}" Padding="0">
                     <StackPanel>
