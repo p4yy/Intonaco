@@ -20,7 +20,10 @@ param(
     [int]$DurationSeconds = 30,
     [ValidateRange(0, 60)]
     [int]$WarmupSeconds = 5,
-    [string]$OutputCsv
+    [string]$OutputCsv,
+    [ValidateRange(1, 100000)]
+    [double]$RamTargetMiB = 100,
+    [switch]$EnforceRamTarget
 )
 
 $ErrorActionPreference = 'Stop'
@@ -134,5 +137,11 @@ $cpu = $samples | Measure-Object CpuPercent -Average -Maximum
     PeakPrivateMemoryMB = [math]::Round($private.Maximum, 2)
     AvgCpuPercent = [math]::Round($cpu.Average, 2)
     PeakCpuPercent = [math]::Round($cpu.Maximum, 2)
-    Note = 'Includes named helpers and child processes. Record GPU Video Decode and GPU memory separately.'
+    RamTargetMiB = $RamTargetMiB
+    PeakTotalRamWithinTarget = ($ram.Maximum -lt $RamTargetMiB)
+    Note = 'Includes helpers and subprocesses; GPU memory/decode must be checked separately.'
 } | Format-List
+
+if ($EnforceRamTarget -and $ram.Maximum -ge $RamTargetMiB) {
+    throw "FAIL: $App peak TOTAL working set $([math]::Round($ram.Maximum, 2)) MiB is not below $RamTargetMiB MiB. Do not claim the memory target has been met."
+}
