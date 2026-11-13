@@ -32,25 +32,27 @@ namespace Intonaco.Tests
         }
 
         [Theory]
-        [InlineData(null, "Windows")]
-        [InlineData("", "Windows")]
-        [InlineData("Invalid", "Windows")]
+        [InlineData(null, "Native")]
+        [InlineData("", "Native")]
+        [InlineData("Invalid", "Native")]
         [InlineData("MPV", "MPV")]
         [InlineData("mpv", "MPV")]
         [InlineData("Windows", "Windows")]
+        [InlineData("Native", "Native")]
+        [InlineData("native", "Native")]
         public void PlaybackBackend_NormalizesSafely(string? input, string expected)
         {
             Assert.Equal(expected, AppSettings.NormalizeBackend(input));
         }
 
         [Fact]
-        public void PlaybackBackend_DefaultsToBundledWindowsEngine()
+        public void PlaybackBackend_DefaultsToBuiltInNativeEngine()
         {
             var settings = new AppSettings();
-            Assert.Equal("Windows", settings.PlaybackBackend);
+            Assert.Equal("Native", settings.PlaybackBackend);
             var normalized = AppSettings.LoadFromJson(
                 "{\"playbackBackend\":\"unknown\"}");
-            Assert.Equal("Windows", normalized.PlaybackBackend);
+            Assert.Equal("Native", normalized.PlaybackBackend);
         }
 
         [Fact]
