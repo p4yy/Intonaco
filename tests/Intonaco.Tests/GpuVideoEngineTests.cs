@@ -238,6 +238,69 @@ namespace Intonaco.Tests
         }
 
         [Fact]
+        public void NativeVideoSessions_NeverOverlapDuringWallpaperSwitch()
+        {
+            // The old desktop window may close while a GPU-driver Present
+            // or Media Foundation Shutdown finishes on a worker thread.
+            // A global lease must protect the entire native decoder lifetime
+            // so the next 4K video cannot double temporary allocations.
+            string? engine = null;
+            for (var folder = new DirectoryInfo(AppContext.BaseDirectory);
+                 folder != null; folder = folder.Parent)
+            {
+                string file = Path.Combine(folder.FullName,
+                    "native", "IntonacoVideo", "engine.cpp");
+                if (File.Exists(file)) { engine = File.ReadAllText(file); break; }
+            }
+
+            Assert.NotNull(engine);
+            Assert.Contains("std::timed_mutex ActiveDecoderLease", engine!);
+            Assert.Contains("ActiveDecoderLease.try_lock_for", engine!);
+            Assert.Contains("std::unique_lock<std::timed_mutex> decoderLease", engine!);
+            Assert.Contains("std::chrono::milliseconds(100)", engine!);
+            Assert.Contains("ERROR_BUSY", engine!);
+            Assert.Contains("s->stop.load(std::memory_order_acquire)", engine!);
+
+            int acquire = engine!.IndexOf(
+                "std::unique_lock<std::timed_mutex> decoderLease");
+            int startup = engine.IndexOf("MFStartup(MF_VERSION)", acquire);
+            int teardown = engine.IndexOf("MFShutdown();", startup);
+            Assert.True(acquire > 0 && startup > acquire && teardown > startup,
+                "The session lease must cover all MF/D3D decoder resources.");
+        }
+
+        [Fact]
+        public void GpuPreview_UsesOnlyExistingShellThumbnailCache()
+        {
+            string? preview = null;
+            string? mainWindow = null;
+            for (var dir = new DirectoryInfo(AppContext.BaseDirectory);
+                 dir != null; dir = dir.Parent)
+            {
+                string thumbnailFile = Path.Combine(dir.FullName,
+                    "src", "Intonaco", "Core", "VideoThumbnail.cs");
+                string mainFile = Path.Combine(dir.FullName,
+                    "src", "Intonaco", "Views", "MainWindow.xaml.cs");
+                if (File.Exists(thumbnailFile) && File.Exists(mainFile))
+                {
+                    preview = File.ReadAllText(thumbnailFile);
+                    mainWindow = File.ReadAllText(mainFile);
+                    break;
+                }
+            }
+
+            Assert.NotNull(preview);
+            Assert.NotNull(mainWindow);
+            Assert.Contains("private const uint CacheOnly = 0x10", preview!);
+            Assert.Contains("ThumbnailOnly | (cachedThumbnailOnly ? CacheOnly : 0u)", preview!);
+            Assert.Contains("cachedThumbnailOnly: _player is GpuVideoWallpaperPlayer",
+                mainWindow!);
+            Assert.Contains("if (_player is GpuVideoWallpaperPlayer && !_lastVideoOpened)",
+                mainWindow!);
+            Assert.DoesNotContain("EmptyWorkingSet", mainWindow!);
+        }
+
+        [Fact]
         public void OriginalVideoModule_HasAllExpectedNativeExports()
         {
             if (!OperatingSystem.IsWindows())
