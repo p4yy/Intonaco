@@ -589,7 +589,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                 <TextBlock Text="Video engine" Style="{StaticResource SettingTitleText}" />
-                                <TextBlock Text="Native Windows video is built in; no extra installation"
+                                <TextBlock Text="Intonaco GPU: direct D3D11 hardware video, no extra installation"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
                             <ComboBox x:Name="BackendComboBox"
@@ -598,6 +598,7 @@
                                       Width="155" VerticalAlignment="Center"
                                       AutomationProperties.Name="Video playback engine"
                                       SelectionChanged="OnBackendChanged">
+                                <ComboBoxItem Content="Intonaco GPU (test)" Tag="GPU" />
                                 <ComboBoxItem Content="Native (built in)" Tag="Native" IsSelected="True" />
                                 <ComboBoxItem Content="Windows (fallback)" Tag="Windows" />
                                 <ComboBoxItem Content="MPV (optional)" Tag="MPV" />
