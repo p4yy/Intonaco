@@ -1210,7 +1210,11 @@ namespace Intonaco.Views
             BitmapSource? image = null;
             try
             {
-                image = await VideoThumbnail.LoadAsync(filePath);
+                // When GPU playback is active, only retrieve an existing
+                // Windows thumbnail. A cache miss is cheaper than launching
+                // an entirely separate 4K decode for a 480px preview.
+                image = await VideoThumbnail.LoadAsync(filePath,
+                    cachedThumbnailOnly: _player is GpuVideoWallpaperPlayer);
             }
             catch (Exception ex)
             {
