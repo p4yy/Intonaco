@@ -14,6 +14,7 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <new>
 #include <string>
 #include <thread>
@@ -174,6 +175,13 @@ namespace
         return hr;
     }
 
+    // Only one native Windows Media Foundation/D3D11 decoder may own GPU
+    // resources at a time. The old UI can close its window after a bounded
+    // wait while the OS finishes decoder shutdown on its worker thread.
+    // Without this lease a fast wallpaper change temporarily duplicates
+    // decoder reference surfaces and swapchains, causing large RAM spikes.
+    static std::timed_mutex ActiveDecoderLease;
+
     struct Engine
     {
         HWND hwnd{};
@@ -192,6 +200,32 @@ namespace
                 std::shared_ptr<SharedState> s;
                 ~Completion() { s->finished.store(true, std::memory_order_release); }
             } completion{s};
+
+            // Serialize *complete* native GPU session lifetimes, not only
+            // playback. A stopping decoder can be delayed by D3D drivers
+            // after Intonaco's UI has moved on to the new wallpaper. Wait on
+            // this background thread (never WPF UI) until its resources have
+            // actually gone away. Cancellation stays responsive.
+            const auto deadline =
+                std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (!ActiveDecoderLease.try_lock_for(
+                std::chrono::milliseconds(100)))
+            {
+                if (s->stop.load(std::memory_order_acquire))
+                    return;
+                if (std::chrono::steady_clock::now() >= deadline)
+                {
+                    s->error.store(static_cast<int>(
+                        HRESULT_FROM_WIN32(ERROR_BUSY)));
+                    s->phase.store(-1);
+                    return;
+                }
+            }
+            std::unique_lock<std::timed_mutex> decoderLease(
+                ActiveDecoderLease, std::adopt_lock);
+            if (s->stop.load(std::memory_order_acquire))
+                return;
+
             const HRESULT co = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
             const bool uninitializeCo = SUCCEEDED(co);
             bool startedMf = false;
