@@ -25,6 +25,9 @@ namespace Intonaco.Core
             public int GpuDecode;
             public int Width;
             public int Height;
+            // Native 4K decoder has been shut down. Only the last full-quality
+            // DXGI frame remains for the desktop wallpaper to display.
+            public int DecoderSleeping;
             public double DurationSeconds;
             public double PositionSeconds;
             public long FramesPresented;
@@ -71,6 +74,7 @@ namespace Intonaco.Core
         private TimeSpan _position;
         private long _frames;
         private bool _errorRaised;
+        private bool _lastDecoderSleeping;
         private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
 
         public GpuVideoWallpaperPlayer()
@@ -227,6 +231,15 @@ namespace Intonaco.Core
                     return;
                 }
 
+                bool decoderSleeping = s.DecoderSleeping != 0;
+                if (decoderSleeping != _lastDecoderSleeping)
+                {
+                    _lastDecoderSleeping = decoderSleeping;
+                    DebugLog.Write(decoderSleeping
+                        ? "GPU deep pause active: decoder shut down, frozen DXGI frame retained."
+                        : "GPU deep pause exited: video decoder restarted on resume.");
+                }
+
                 if (s.Width > 0 && s.Height > 0)
                 {
                     NaturalVideoWidth = s.Width;
@@ -337,6 +350,7 @@ namespace Intonaco.Core
             }
             _mediaOpened = false;
             _errorRaised = false;
+            _lastDecoderSleeping = false;
             _pauseRequested = false;
             _position = TimeSpan.Zero;
             NaturalVideoWidth = NaturalVideoHeight = 0;
