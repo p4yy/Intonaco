@@ -46,18 +46,24 @@ jobs:
       - name: Build
         run: dotnet build Intonaco.sln -c Release --no-restore
 
-      - name: Validate three-engine performance benchmark script
+      - name: Validate and test four-way performance benchmark
         shell: pwsh
         run: |
-          $scriptPath = (Resolve-Path tools/Compare-WallpaperPerformance.ps1).Path
-          $tokens = $null
-          $parseErrors = $null
-          [void][System.Management.Automation.Language.Parser]::ParseFile(
-            $scriptPath, [ref]$tokens, [ref]$parseErrors)
-          if ($parseErrors -and $parseErrors.Count -gt 0) {
-            $parseErrors | ForEach-Object { Write-Host "::error::$_" }
-            throw "The Intonaco/Lively/AutoWall benchmark has PowerShell syntax errors."
+          foreach ($file in @(
+              'tools/Compare-WallpaperPerformance.ps1',
+              'tools/Summarize-WallpaperBenchmarks.ps1',
+              'tools/Test-WallpaperBenchmarks.ps1')) {
+            $path = (Resolve-Path $file).Path
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $path, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors -and $parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Host "::error::$_" }
+              throw "$file has PowerShell syntax errors."
+            }
           }
+          ./tools/Test-WallpaperBenchmarks.ps1
 
       - name: Test
         run: >-
