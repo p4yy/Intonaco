@@ -321,6 +321,49 @@ namespace
                     while (!s->stop.load(std::memory_order_acquire))
                     {
                         if (s->phase.load() < 0) break;
+
+                        const bool wantedMute = s->mute.load();
+                        const bool wantedLoop = s->loop.load();
+                        const bool wantedPause = s->pause.load();
+                        const bool wantedFill = s->fill.load();
+                        const double wantedVolume = s->volume.load();
+                        const double wantedSpeed = s->speed.load();
+
+                        // A paused video is a still image. DWM retains the
+                        // last presented DXGI frame; after a short grace period
+                        // release the source, decoder and its reference frames.
+                        // The flip swap chain stays alive so the artwork does
+                        // not disappear or change colors when frozen.
+                        if (!player)
+                        {
+                            if (s->seekRequested.exchange(false))
+                                frozenPosition = s->seekTo.load();
+
+                            if (wantedPause)
+                            {
+                                s->phase.store(3);
+                                std::this_thread::sleep_for(
+                                    std::chrono::milliseconds(350));
+                                continue;
+                            }
+
+                            hr = openMediaSession();
+                            if (FAILED(hr)) { fail(hr); break; }
+
+                            // Resume the *same frame position*, not the first
+                            // frame of the loop. Seek completion is async;
+                            // avoid presenting frame 0 before seeking.
+                            resumeNeedsSeek = frozenPosition > 0.001;
+                            resumeSeekIssued = false;
+                            begun = false;
+                            lastPause = false;
+                            lastMute = !wantedMute;
+                            lastLoop = !wantedLoop;
+                            lastVolume = -1;
+                            lastSpeed = -1;
+                            s->phase.store(1);
+                        }
+
                         if (s->loaded.load())
                         {
                             DWORD nativeW = 0, nativeH = 0;
@@ -336,13 +379,6 @@ namespace
                                 s->duration.store(duration);
                         }
 
-                        const bool wantedMute = s->mute.load();
-                        const bool wantedLoop = s->loop.load();
-                        const bool wantedPause = s->pause.load();
-                        const bool wantedFill = s->fill.load();
-                        const double wantedVolume = s->volume.load();
-                        const double wantedSpeed = s->speed.load();
-
                         if (wantedMute != lastMute) player->SetMuted(wantedMute);
                         lastMute = wantedMute;
                         if (wantedVolume != lastVolume) player->SetVolume(wantedVolume);
@@ -352,23 +388,89 @@ namespace
                         if (wantedSpeed != lastSpeed) player->SetPlaybackRate(wantedSpeed);
                         lastSpeed = wantedSpeed;
 
+                        if (s->seekRequested.load() && resumeNeedsSeek)
+                        {
+                            frozenPosition = s->seekTo.load();
+                            s->seekRequested.store(false);
+                            resumeSeekIssued = false;
+                            s->seeked.store(false);
+                        }
+
                         if (s->canPlay.load() && !begun)
                         {
-                            begun = true;
-                            player->Play();
+                            bool readyToPlay = true;
+                            if (resumeNeedsSeek)
+                            {
+                                if (!resumeSeekIssued)
+                                {
+                                    hr = player->SetCurrentTime(frozenPosition);
+                                    resumeSeekIssued = SUCCEEDED(hr);
+                                    seekStarted = std::chrono::steady_clock::now();
+                                }
+                                readyToPlay = !resumeSeekIssued ||
+                                    s->seeked.load() ||
+                                    (std::chrono::steady_clock::now() -
+                                        seekStarted > std::chrono::seconds(2));
+                            }
+                            if (readyToPlay)
+                            {
+                                resumeNeedsSeek = false;
+                                begun = true;
+                                player->Play();
+                            }
                         }
+
                         if (begun && wantedPause != lastPause)
                         {
-                            if (wantedPause) player->Pause();
-                            else player->Play();
+                            if (wantedPause)
+                            {
+                                player->Pause();
+                                pausedAt = std::chrono::steady_clock::now();
+                            }
+                            else
+                            {
+                                player->Play();
+                            }
                             lastPause = wantedPause;
                         }
-                        if (s->seekRequested.exchange(false))
-                            player->SetCurrentTime(s->seekTo.load());
-                        if (s->ended.exchange(false) && wantedLoop && begun)
+
+                        if (s->seekRequested.load() && s->canPlay.load() &&
+                            !resumeNeedsSeek && begun)
                         {
-                            player->SetCurrentTime(0);
-                            player->Play();
+                            double position = s->seekTo.load();
+                            s->seekRequested.store(false);
+                            player->SetCurrentTime(position);
+                        }
+
+                        // IMFMediaEngine::SetLoop already loops the media.
+                        // ENDED is not sent when loop is enabled; trying to
+                        // seek and Play again is redundant and can thrash a
+                        // five-second 4K wallpaper on every repetition.
+                        s->ended.store(false);
+
+                        if (begun && wantedPause && lastPause &&
+                            s->frames.load() > 0 &&
+                            std::chrono::steady_clock::now() - pausedAt >=
+                                DeepPauseDelay)
+                        {
+                            double position = player->GetCurrentTime();
+                            if (std::isfinite(position) && position >= 0)
+                            {
+                                frozenPosition = position;
+                                s->position.store(position);
+                            }
+                            // Invalidate callback events before shutdown.
+                            ++s->generation;
+                            player->Shutdown();
+                            player.Reset();
+                            s->decoderSleeping.store(1);
+                            s->phase.store(3);
+                            begun = false;
+                            // Keep swapchain contents, defer any resize until
+                            // playback resumes so the frozen frame stays put.
+                            std::this_thread::sleep_for(
+                                std::chrono::milliseconds(350));
+                            continue;
                         }
 
                         RECT nowRect{};
@@ -485,14 +587,19 @@ namespace
                             s->phase.store(1);
                         }
 
-                        // Frame-ready check is cheap; 8 ms gives 30/60 FPS
-                        // low latency without a spinning UI/compositor.
+                        // 16 ms polling avoids doing five empty checks
+                        // between frames of a 24 FPS wallpaper. Paused mode
+                        // uses a slow clock and never renders a new frame.
                         std::this_thread::sleep_for(
-                            std::chrono::milliseconds(wantedPause ? 80 : 8));
+                            std::chrono::milliseconds(wantedPause ? 120 : 16));
                     }
 
-                    player->Pause();
-                    player->Shutdown();
+                    if (player)
+                    {
+                        player->Pause();
+                        player->Shutdown();
+                        player.Reset();
+                    }
                 }
             }
             catch (...)
@@ -561,8 +668,8 @@ extern "C"
         if (!handle || !output) return E_POINTER;
         const auto& s = *static_cast<Engine*>(handle)->state;
         *output = {s.phase.load(), s.error.load(), s.gpu.load(),
-            s.width.load(), s.height.load(), s.duration.load(),
-            s.position.load(), s.frames.load()};
+            s.width.load(), s.height.load(), s.decoderSleeping.load(),
+            s.duration.load(), s.position.load(), s.frames.load()};
         return S_OK;
     }
 
