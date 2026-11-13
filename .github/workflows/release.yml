@@ -63,6 +63,12 @@ jobs:
           /p:Version=${{ steps.version.outputs.version }}
           /p:PublishSingleFile=false /p:PublishReadyToRun=true
 
+      - name: Verify native video renderer in release payload
+        shell: pwsh
+        run: |
+          if (-not (Test-Path publish/installer-app/Intonaco.Video.dll)) {
+            throw 'Release is missing GPU renderer. Do not publish.'
+          }
       - name: Create and smoke-test EXE installer
         shell: pwsh
         run: |
