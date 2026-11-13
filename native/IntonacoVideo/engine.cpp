@@ -322,6 +322,12 @@ namespace
                     double lastVolume = -1;
                     double lastSpeed = -1;
                     LONG srcW = 0, srcH = 0;
+                    // Metadata is static for local wallpaper files. Calling
+                    // these Media Foundation COM getters on every 16ms
+                    // frame-server tick needlessly contends with decoding.
+                    bool metadataReady = false;
+                    auto nextMetadataQuery = std::chrono::steady_clock::now();
+                    auto nextPositionQuery = std::chrono::steady_clock::now();
 
                     while (!s->stop.load(std::memory_order_acquire))
                     {
@@ -360,6 +366,9 @@ namespace
                             // avoid presenting frame 0 before seeking.
                             resumeNeedsSeek = frozenPosition > 0.001;
                             resumeSeekIssued = false;
+                            metadataReady = false;
+                            nextMetadataQuery = std::chrono::steady_clock::now();
+                            nextPositionQuery = nextMetadataQuery;
                             begun = false;
                             lastPause = false;
                             lastMute = !wantedMute;
@@ -369,10 +378,19 @@ namespace
                             s->phase.store(1);
                         }
 
-                        if (s->loaded.load())
+                        if (s->loaded.load() && !metadataReady &&
+                            std::chrono::steady_clock::now() >= nextMetadataQuery)
                         {
+                            // A source may report metadata before its video
+                            // dimensions settle. Retry at 500ms intervals,
+                            // never 60 times a second during 4K decoding.
+                            nextMetadataQuery =
+                                std::chrono::steady_clock::now() +
+                                std::chrono::milliseconds(500);
                             DWORD nativeW = 0, nativeH = 0;
-                            if (SUCCEEDED(player->GetNativeVideoSize(&nativeW, &nativeH)))
+                            if (SUCCEEDED(player->GetNativeVideoSize(
+                                    &nativeW, &nativeH)) &&
+                                nativeW > 0 && nativeH > 0)
                             {
                                 srcW = static_cast<LONG>(nativeW);
                                 srcH = static_cast<LONG>(nativeH);
@@ -382,6 +400,7 @@ namespace
                             const double duration = player->GetDuration();
                             if (std::isfinite(duration) && duration > 0)
                                 s->duration.store(duration);
+                            metadataReady = srcW > 0 && srcH > 0;
                         }
 
                         if (wantedMute != lastMute) player->SetMuted(wantedMute);
@@ -582,9 +601,18 @@ namespace
                         (void)lastFill;
                         if (begun)
                         {
-                            double position = player->GetCurrentTime();
-                            if (std::isfinite(position) && position >= 0)
-                                s->position.store(position);
+                            // The UI reads playback position every 300ms.
+                            // Avoid an expensive 60Hz COM query that doesn't
+                            // help video presentation or image quality.
+                            if (std::chrono::steady_clock::now() >= nextPositionQuery)
+                            {
+                                nextPositionQuery =
+                                    std::chrono::steady_clock::now() +
+                                    std::chrono::milliseconds(200);
+                                double position = player->GetCurrentTime();
+                                if (std::isfinite(position) && position >= 0)
+                                    s->position.store(position);
+                            }
                             s->phase.store(wantedPause ? 3 : 2);
                         }
                         else if (s->loaded.load())
