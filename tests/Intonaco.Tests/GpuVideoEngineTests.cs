@@ -208,6 +208,29 @@ namespace Intonaco.Tests
         }
 
         [Fact]
+        public void GPUThumbnail_OnlyLoadsWhenSettingsWindowIsVisible()
+        {
+            string? code = null;
+            for (var dir = new DirectoryInfo(AppContext.BaseDirectory);
+                 dir != null; dir = dir.Parent)
+            {
+                string file = Path.Combine(dir.FullName, "src", "Intonaco",
+                    "Views", "MainWindow.xaml.cs");
+                if (File.Exists(file)) { code = File.ReadAllText(file); break; }
+            }
+            Assert.NotNull(code);
+            int showPreview = code!.IndexOf("private void ShowStaticPreview()");
+            int visibilityGuard = code.IndexOf("if (!IsPreviewWindowVisible)",
+                showPreview);
+            int thumbnailRequest = code.IndexOf("_ = LoadStaticPreviewAsync(",
+                showPreview);
+            Assert.True(showPreview >= 0 && visibilityGuard > showPreview &&
+                thumbnailRequest > visibilityGuard,
+                "Hidden settings must not trigger an Explorer 4K thumbnail decode.");
+            Assert.Contains("RefreshPreviewForCurrentState();", code);
+        }
+
+        [Fact]
         public void OriginalVideoModule_HasAllExpectedNativeExports()
         {
             if (!OperatingSystem.IsWindows())
