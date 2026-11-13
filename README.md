@@ -21,13 +21,11 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-293B3A" alt="MIT license" /></a>
 </p>
 
-## See it in action
+## Official trailer
 
-<a href="https://cdn.jsdelivr.net/gh/p4yy/Intonaco@v2.2.0/docs/demo/intonaco-demo.mp4">
-  <img src="docs/demo/intonaco-demo-preview.gif" alt="Real Intonaco Wallpaper desktop recording showing the application and animated wallpaper" width="800" />
-</a>
+[![Watch the Intonaco Wallpaper official trailer on YouTube](https://i.ytimg.com/vi/ne2Bk_dG3JY/maxresdefault.jpg)](https://www.youtube.com/watch?v=ne2Bk_dG3JY)
 
-<sub>Real application recording. [Play the demo with sound](https://cdn.jsdelivr.net/gh/p4yy/Intonaco@v2.2.0/docs/demo/intonaco-demo.mp4) · [View a still screenshot](docs/demo/intonaco-demo-poster.png)</sub>
+[**Watch the official trailer on YouTube**](https://www.youtube.com/watch?v=ne2Bk_dG3JY) · [Short app recording](https://cdn.jsdelivr.net/gh/p4yy/Intonaco@v2.2.0/docs/demo/intonaco-demo.mp4)
 
 ## Screenshots
 

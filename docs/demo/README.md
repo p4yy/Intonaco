@@ -1,6 +1,6 @@
 # README demo media
 
-These files power the demo at the top of the root [`README.md`](../../README.md).
+These files preserve a short real-app recording linked from the root [`README.md`](../../README.md). The featured official trailer is hosted on [YouTube](https://www.youtube.com/watch?v=ne2Bk_dG3JY).
 They were derived from a 13.7 s, 1920×1200 screen recording supplied by the
 project owner, then re-encoded for the web.
 
