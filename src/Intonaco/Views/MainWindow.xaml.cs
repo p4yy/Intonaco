@@ -352,6 +352,7 @@ namespace Intonaco.Views
                     return;
 
                 _desktop.EnsurePlacement();
+                DisableOptionalPreviewIfOverBudget();
                 // Sample once per 45 seconds while playing, without forcing a
                 // GC or opening an extra decoder. Logs show whether the heavy
                 // RAM is in managed objects, native Media Foundation or mpv.
@@ -1190,10 +1191,46 @@ namespace Intonaco.Views
                 ShowStaticPreview();
         }
 
+        // The optional in-app video preview creates a SECOND decoder. It is
+        // never more important than the full-resolution desktop playback.
+        private const long OptionalPreviewPrivateMemoryBudget = 384L * 1024 * 1024;
+
+        private bool IsOptionalPreviewOverBudget()
+        {
+            try
+            {
+                using var process = Process.GetCurrentProcess();
+                process.Refresh();
+                return process.PrivateMemorySize64 >= OptionalPreviewPrivateMemoryBudget;
+            }
+            catch (InvalidOperationException) { return false; }
+            catch (Win32Exception) { return false; }
+        }
+
+        private void DisableOptionalPreviewIfOverBudget()
+        {
+            if (!_livePreviewEnabled || !IsOptionalPreviewOverBudget())
+                return;
+
+            _livePreviewEnabled = false;
+            ReleasePreviewPipeline();
+            ShowStaticPreview();
+            PreviewModeButton.Content = "Play live preview";
+            PreviewStatusText.Text = "Still preview — memory saver";
+            DebugLog.Write("Optional second video decoder disabled after exceeding 384 MiB private memory.");
+        }
+
         private void OnToggleLivePreview(object sender, RoutedEventArgs e)
         {
             if (_previewFilePath == null || _player is MpvWallpaperPlayer)
                 return;
+
+            if (!_livePreviewEnabled && IsOptionalPreviewOverBudget())
+            {
+                PreviewStatusText.Text = "Still preview — memory saver";
+                DebugLog.Write("Optional second video decoder skipped: already above 384 MiB private memory.");
+                return;
+            }
 
             _livePreviewEnabled = !_livePreviewEnabled;
             PreviewModeButton.Content = _livePreviewEnabled
