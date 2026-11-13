@@ -51,6 +51,12 @@ jobs:
           dotnet publish src/Intonaco/Intonaco.csproj -c Release -r win-x64
           --self-contained true /p:StoreBuild=true /p:PublishSingleFile=false
           /p:PublishReadyToRun=true -o artifacts/store-app
+      - name: Verify native video module in Store package
+        shell: pwsh
+        run: |
+          if (-not (Test-Path artifacts/store-app/Intonaco.Video.dll)) {
+            throw 'Store package is missing original Intonaco GPU renderer.'
+          }
       - name: Build and validate MSIX
         shell: pwsh
         env:
