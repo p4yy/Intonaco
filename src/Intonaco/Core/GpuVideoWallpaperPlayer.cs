@@ -81,6 +81,7 @@ namespace Intonaco.Core
         private long _frames;
         private bool _errorRaised;
         private bool _lastDecoderSleeping;
+        private bool _waitingForDecoderRelease;
         private long _telemetryStartTicks;
         private long _telemetryStartFrames;
         private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
@@ -179,6 +180,7 @@ namespace Intonaco.Core
                 _file = System.IO.Path.GetFullPath(path);
                 _mediaOpened = false;
                 _errorRaised = false;
+                _waitingForDecoderRelease = false;
                 _frames = 0;
                 _telemetryStartTicks = 0;
                 _telemetryStartFrames = 0;
@@ -239,8 +241,23 @@ namespace Intonaco.Core
                 {
                     ReportError("GPU video playback failed (HRESULT 0x" +
                         unchecked((uint)s.ErrorHresult).ToString("X8") +
-                        "). Select Windows (fallback) if your GPU is unsupported.");
+                        "). The previous GPU decoder may still be shutting down. " +
+                        "If repeated, select Windows (fallback) and send debug.log.");
                     return;
+                }
+
+                if (s.Phase == 4 && !_waitingForDecoderRelease)
+                {
+                    _waitingForDecoderRelease = true;
+                    DebugLog.Write("GPU wallpaper switch: waiting on background " +
+                        "worker for previous DirectX decoder teardown; " +
+                        "new decoder will not be started simultaneously.");
+                }
+                else if (s.Phase != 4 && _waitingForDecoderRelease)
+                {
+                    _waitingForDecoderRelease = false;
+                    DebugLog.Write("GPU wallpaper switch: previous decoder fully " +
+                        "released; new GPU session may begin.");
                 }
 
                 bool decoderSleeping = s.DecoderSleeping != 0;
@@ -437,6 +454,7 @@ namespace Intonaco.Core
             _mediaOpened = false;
             _errorRaised = false;
             _lastDecoderSleeping = false;
+            _waitingForDecoderRelease = false;
             _telemetryStartTicks = 0;
             _telemetryStartFrames = 0;
             _poll.Interval = TimeSpan.FromMilliseconds(300);

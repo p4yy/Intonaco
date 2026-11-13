@@ -1186,6 +1186,14 @@ namespace Intonaco.Views
             if (!IsPreviewWindowVisible)
                 return;
 
+            // The OS thumbnail provider may open another 4K media decoder.
+            // During a GPU wallpaper switch the previous decoder may still
+            // be cleaning up and the new one is just starting. Never start
+            // a third decode before the newly selected wallpaper has opened.
+            // OnMediaOpened schedules the deferred preview once ready.
+            if (_player is GpuVideoWallpaperPlayer && !_lastVideoOpened)
+                return;
+
             if (!string.Equals(_thumbnailRequestedFor, _previewFilePath,
                 StringComparison.OrdinalIgnoreCase))
             {
@@ -1202,7 +1210,11 @@ namespace Intonaco.Views
             BitmapSource? image = null;
             try
             {
-                image = await VideoThumbnail.LoadAsync(filePath);
+                // When GPU playback is active, only retrieve an existing
+                // Windows thumbnail. A cache miss is cheaper than launching
+                // an entirely separate 4K decode for a 480px preview.
+                image = await VideoThumbnail.LoadAsync(filePath,
+                    cachedThumbnailOnly: _player is GpuVideoWallpaperPlayer);
             }
             catch (Exception ex)
             {
@@ -2252,9 +2264,15 @@ namespace Intonaco.Views
 
         private void OnMediaOpened(TimeSpan duration)
         {
+            // Decoder events are posted asynchronously. If the owner changes
+            // wallpaper before this callback reaches WPF, an old MediaOpened
+            // must not mark the *new* source as ready or trigger a second
+            // thumbnail extraction while the new GPU session is starting.
+            int requestVersion = _wallpaperRequestVersion;
             Dispatcher.BeginInvoke(() =>
             {
-                if (!_isApplied) return;
+                if (!_isApplied || requestVersion != _wallpaperRequestVersion)
+                    return;
 
                 // MediaElement can misinterpret broken MP4 pixel-aspect data:
                 // e.g. report 232x2160 for a genuine 3840x2160 video. Never
@@ -2292,6 +2310,13 @@ namespace Intonaco.Views
                 FileInfoText.Text = info;
                 RefreshRecentWallpapers();
                 RefreshSeekProgress();
+
+                // Only after native playback opens may the optional Shell
+                // thumbnail provider start. It must not overlap decoder
+                // teardown and the following wallpaper's startup.
+                if (_player is GpuVideoWallpaperPlayer &&
+                    IsPreviewWindowVisible && _previewFilePath != null)
+                    ShowStaticPreview();
             });
         }
 

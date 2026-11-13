@@ -17,6 +17,10 @@ namespace Intonaco.Core
     {
         private static readonly SemaphoreSlim Gate = new(1, 1);
         private const uint ThumbnailOnly = 0x8;
+        // SIIGBF_INCACHEONLY: retrieve cached thumbnail but do not run a
+        // codec/thumbnail provider. The GPU wallpaper already has one
+        // hardware decoder, so a second 4K decode is never acceptable.
+        private const uint CacheOnly = 0x10;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct ShellSize
@@ -51,7 +55,8 @@ namespace Intonaco.Core
         private static extern bool DeleteObject(IntPtr handle);
 
         internal static async Task<BitmapSource?> LoadAsync(
-            string filePath, CancellationToken cancellationToken = default)
+            string filePath, CancellationToken cancellationToken = default,
+            bool cachedThumbnailOnly = false)
         {
             await Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
@@ -60,7 +65,11 @@ namespace Intonaco.Core
                     TaskCreationOptions.RunContinuationsAsynchronously);
                 var thread = new Thread(() =>
                 {
-                    try { tcs.TrySetResult(Extract(filePath)); }
+                    try
+                    {
+                        tcs.TrySetResult(cancellationToken.IsCancellationRequested
+                            ? null : Extract(filePath, cachedThumbnailOnly));
+                    }
                     catch (Exception) { tcs.TrySetResult(null); }
                 })
                 {
@@ -77,7 +86,7 @@ namespace Intonaco.Core
             }
         }
 
-        private static BitmapSource? Extract(string path)
+        private static BitmapSource? Extract(string path, bool cachedThumbnailOnly)
         {
             IShellItemImageFactory? factory = null;
             IntPtr hbitmap = IntPtr.Zero;
@@ -88,7 +97,8 @@ namespace Intonaco.Core
                     ref iid, out factory);
                 if (factory == null ||
                     factory.GetImage(new ShellSize(480, 270),
-                        ThumbnailOnly, out hbitmap) != 0 ||
+                        ThumbnailOnly | (cachedThumbnailOnly ? CacheOnly : 0u),
+                        out hbitmap) != 0 ||
                     hbitmap == IntPtr.Zero)
                     return null;
 
