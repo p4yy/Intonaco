@@ -348,8 +348,19 @@ namespace Intonaco.Views
             };
             _placementTimer.Tick += (_, _) =>
             {
-                if (_isApplied)
-                    _desktop.EnsurePlacement();
+                if (!_isApplied)
+                    return;
+
+                _desktop.EnsurePlacement();
+                // Sample once per 45 seconds while playing, without forcing a
+                // GC or opening an extra decoder. Logs show whether the heavy
+                // RAM is in managed objects, native Media Foundation or mpv.
+                RuntimeMemoryDiagnostics.LogIfDue(
+                    _player is MpvWallpaperPlayer ? "MPV" : "Windows",
+                    _livePreviewEnabled && PreviewMedia.Source != null,
+                    _player.NaturalVideoWidth, _player.NaturalVideoHeight,
+                    _player is MpvWallpaperPlayer mpv
+                        ? mpv.HelperWorkingSetBytes : 0);
             };
             UpdateBackgroundTimers();
         }
