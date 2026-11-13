@@ -78,6 +78,35 @@ namespace Intonaco.Tests
         }
 
         [Fact]
+        public void GpuLoop_CachesStaticMetadataAndThrottlesClockQueries()
+        {
+            // This test guards against reintroducing unnecessary Windows
+            // Media Foundation COM traffic on every 16ms display tick.
+            string? source = null;
+            for (var folder = new DirectoryInfo(AppContext.BaseDirectory);
+                 folder != null; folder = folder.Parent)
+            {
+                string file = Path.Combine(folder.FullName,
+                    "native", "IntonacoVideo", "engine.cpp");
+                if (File.Exists(file))
+                {
+                    source = File.ReadAllText(file);
+                    break;
+                }
+            }
+
+            Assert.NotNull(source);
+            Assert.Contains("bool metadataReady = false", source!);
+            Assert.Contains("!metadataReady", source!);
+            Assert.Contains("std::chrono::milliseconds(500)", source!);
+            Assert.Contains("std::chrono::milliseconds(200)", source!);
+            Assert.Contains("metadataReady = false;", source!);
+            Assert.Contains("player->OnVideoStreamTick", source!);
+            Assert.Contains("player->TransferVideoFrame", source!);
+            Assert.DoesNotContain("EmptyWorkingSet", source!);
+        }
+
+        [Fact]
         public void OriginalVideoModule_HasAllExpectedNativeExports()
         {
             if (!OperatingSystem.IsWindows())
