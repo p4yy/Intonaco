@@ -22,7 +22,9 @@ namespace Intonaco.Core
         public bool IsMuted { get; set; } = true;
         public double Volume { get; set; } = 0.0;
         public int TargetFps { get; set; } = 30;
-        public string PlaybackBackend { get; set; } = "Windows"; // "Windows" or "MPV"
+        // Native uses a Windows in-process player (no separate .exe).
+        // Windows remains a compatibility fallback for older driver stacks.
+        public string PlaybackBackend { get; set; } = "Native"; // "Native", "Windows" or "MPV"
         // Optional user-selected mpv.exe: Intonaco never bundles or downloads it.
         public string? MpvExecutablePath { get; set; }
         public string WallpaperFit { get; set; } = "Fill"; // "Fill", "Fit", "Stretch"
@@ -84,7 +86,9 @@ namespace Intonaco.Core
 
         internal static string NormalizeBackend(string? backend) =>
             string.Equals(backend, "MPV", StringComparison.OrdinalIgnoreCase)
-                ? "MPV" : "Windows";
+                ? "MPV" :
+            string.Equals(backend, "Windows", StringComparison.OrdinalIgnoreCase)
+                ? "Windows" : "Native";
 
         internal static string NormalizeFit(string? fit)
         {
