@@ -5,7 +5,7 @@
 
 <p align="center">
   <a href="https://github.com/p4yy/Intonaco/actions/workflows/ci.yml"><img alt="Build and tests" src="https://github.com/p4yy/Intonaco/actions/workflows/ci.yml/badge.svg" /></a>
-  <a href="https://github.com/p4yy/Intonaco/releases/tag/Intonaco-Wallpaper"><img alt="Download Intonaco Wallpaper" src="https://img.shields.io/badge/Download-Intonaco_Wallpaper-83DFCC" /></a>
+  <a href="https://github.com/p4yy/Intonaco/releases/tag/v2.2.0"><img alt="Download Intonaco Wallpaper" src="https://img.shields.io/badge/Download-v2.2.0-83DFCC" /></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-293B3A" /></a>
 </p>
 
@@ -38,15 +38,15 @@ No accounts, wallpaper storefront, embedded browser, telemetry SDK or background
 
 ## Install
 
-Download the current build from the [single official release](https://github.com/p4yy/Intonaco/releases/tag/Intonaco-Wallpaper).
+Download the current build from the [official Intonaco Wallpaper v2.2.0 release](https://github.com/p4yy/Intonaco/releases/tag/v2.2.0).
 
 | Download | Purpose |
 | --- | --- |
-| [Standard installer](https://github.com/p4yy/Intonaco/releases/download/Intonaco-Wallpaper/Intonaco-Wallpaper-Setup.exe) | Windows 10/11 installation with Start menu shortcuts; .NET runtime included |
-| [Portable EXE](https://github.com/p4yy/Intonaco/releases/download/Intonaco-Wallpaper/Intonaco-Wallpaper-Portable.exe) | Run directly without an installer |
-| [Microsoft Store upload](https://github.com/p4yy/Intonaco/releases/download/Intonaco-Wallpaper/Intonaco-Wallpaper.msixupload) | Partner Center submission file; not a desktop installer |
+| [Standard installer](https://github.com/p4yy/Intonaco/releases/download/v2.2.0/Intonaco-Wallpaper-Setup.exe) | Windows 10/11 installation with Start menu shortcuts; .NET runtime included |
+| [Portable EXE](https://github.com/p4yy/Intonaco/releases/download/v2.2.0/Intonaco-Wallpaper-Portable.exe) | Run directly without an installer |
+| [Microsoft Store upload](https://github.com/p4yy/Intonaco/releases/download/v2.2.0/Intonaco-Wallpaper.msixupload) | Partner Center submission file; not a desktop installer |
 
-The public download names do not contain version numbers. Windows and Microsoft Store use an internal numeric version for servicing and updates.
+Each GitHub release is published under its own versioned tag so its original publication date and download files stay together. Windows and Microsoft Store use the corresponding numeric version for updates.
 
 ## Native video engine and format support
 
