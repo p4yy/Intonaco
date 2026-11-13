@@ -54,10 +54,10 @@ namespace Intonaco.Tests
         }
 
         [Fact]
-        public void BuiltInDefault_DoesNotRequireOptionalMpvExecutable()
+        public void GpuDefault_DoesNotRequireOptionalMpvExecutable()
         {
             var settings = new AppSettings();
-            Assert.Equal("Native", settings.PlaybackBackend);
+            Assert.Equal("GPU", settings.PlaybackBackend);
             Assert.Null(settings.MpvExecutablePath);
         }
 
