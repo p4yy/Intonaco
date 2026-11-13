@@ -44,11 +44,19 @@ namespace Intonaco.Tests
             var stats = typeof(GpuVideoWallpaperPlayer).GetNestedType(
                 "Stats", BindingFlags.NonPublic);
             Assert.NotNull(stats);
-            Assert.Equal(48, Marshal.SizeOf(stats!));
+            Assert.Equal(80, Marshal.SizeOf(stats!));
             Assert.Equal((IntPtr)20,
                 Marshal.OffsetOf(stats!, "DecoderSleeping"));
             Assert.Equal((IntPtr)24,
                 Marshal.OffsetOf(stats!, "DurationSeconds"));
+            Assert.Equal((IntPtr)48,
+                Marshal.OffsetOf(stats!, "GpuLocalBytes"));
+            Assert.Equal((IntPtr)56,
+                Marshal.OffsetOf(stats!, "GpuNonLocalBytes"));
+            Assert.Equal((IntPtr)64,
+                Marshal.OffsetOf(stats!, "GpuLocalBudgetBytes"));
+            Assert.Equal((IntPtr)72,
+                Marshal.OffsetOf(stats!, "GpuNonLocalBudgetBytes"));
         }
 
         [Fact]
@@ -168,6 +176,35 @@ namespace Intonaco.Tests
             Assert.Contains("framePresentationFps=", player!);
             Assert.Contains("workingSetMiB=", player!);
             Assert.DoesNotContain("EmptyWorkingSet", player!);
+        }
+
+        [Fact]
+        public void DeepPause_TrimsOnlyIdleDirectXDriverCaches()
+        {
+            // Keep GPU driver caches reclaimable after the Media Foundation
+            // decoder is destroyed. Never call Trim once per live frame.
+            string? engine = null;
+            for (var folder = new DirectoryInfo(AppContext.BaseDirectory);
+                 folder != null; folder = folder.Parent)
+            {
+                string file = Path.Combine(folder.FullName,
+                    "native", "IntonacoVideo", "engine.cpp");
+                if (File.Exists(file)) { engine = File.ReadAllText(file); break; }
+            }
+
+            Assert.NotNull(engine);
+            int shutdown = engine!.IndexOf("player->Shutdown();\n                            player.Reset();");
+            int clear = engine.IndexOf("context->ClearState();", shutdown);
+            int flush = engine.IndexOf("context->Flush();", clear);
+            int trim = engine.IndexOf("idleDxgiDevice->Trim();", flush);
+            int retained = engine.IndexOf("s->decoderSleeping.store(1)", trim);
+            Assert.True(shutdown > 0 && clear > shutdown && flush > clear
+                && trim > flush && retained > trim);
+            Assert.Equal(1, engine.Split("idleDxgiDevice->Trim();").Length - 1);
+            Assert.Contains("DXGI_MEMORY_SEGMENT_GROUP_LOCAL", engine);
+            Assert.Contains("DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL", engine);
+            Assert.Contains("std::chrono::seconds(5)", engine);
+            Assert.DoesNotContain("EmptyWorkingSet", engine);
         }
 
         [Fact]
