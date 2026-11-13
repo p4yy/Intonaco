@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - "src/Intonaco/Intonaco.csproj"
-      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 permissions:
@@ -36,7 +35,7 @@ jobs:
             throw "Invalid internal package version: $version"
           }
           "version=$version" >> $env:GITHUB_OUTPUT
-          "tag=Intonaco-Wallpaper" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
 
       - name: Build Intonaco native GPU renderer (x64, no external app)
         shell: pwsh
@@ -139,26 +138,29 @@ jobs:
           $checksums | Set-Content release/SHA256SUMS.txt -Encoding ascii
           Get-ChildItem release | Format-Table Name, Length
 
-      # This repository deliberately exposes a single stable release URL.
-      # On updates, action-gh-release replaces the binary assets but does not
-      # always advance an existing tag. Sync it explicitly so the public
-      # source snapshot and published 2.2.0 binaries refer to the same commit.
-      - name: Sync official release tag to approved main commit
+      # Each public version has a unique immutable tag and genuine publish date.
+      # Never force-move an existing version tag or overwrite prior binaries.
+      - name: Create new version tag from tested main
         shell: pwsh
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f Intonaco-Wallpaper "${{ github.sha }}"
-          git push --force origin refs/tags/Intonaco-Wallpaper
+          $tag = "${{ steps.version.outputs.tag }}"
+          git tag $tag "${{ github.sha }}"
+          if ($LASTEXITCODE -ne 0) { throw "Could not create release tag $tag." }
+          git push origin "refs/tags/$tag"
           if ($LASTEXITCODE -ne 0) {
-            throw 'Official release tag could not be advanced to the main commit.'
+            throw "Version tag $tag already exists or could not be published. Refusing to replace it."
           }
 
-      - name: Publish one clean GitHub release
+      - name: Publish official versioned GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: Intonaco-Wallpaper
-          name: Intonaco Wallpaper
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Intonaco Wallpaper v${{ steps.version.outputs.version }}
+          make_latest: true
+          draft: false
+          prerelease: false
           generate_release_notes: false
           target_commitish: ${{ github.sha }}
           body: |
@@ -193,3 +195,50 @@ jobs:
             release/*.msixupload
             release/SHA256SUMS.txt
           fail_on_unmatched_files: true
+
+      - name: Verify fresh release assets then retire outdated release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = "${{ steps.version.outputs.tag }}"
+          $repo = "${{ github.repository }}"
+          $release = gh api "repos/$repo/releases/tags/$tag" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $release.tag_name -cne $tag -or
+              $release.draft -or $release.prerelease) {
+            throw "New release $tag could not be verified."
+          }
+          $reference = gh api "repos/$repo/git/ref/tags/$tag" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or
+              $reference.object.sha -cne "${{ github.sha }}") {
+            throw "The $tag source tag does not match this build's commit."
+          }
+          $expected = @('Intonaco-Wallpaper-Setup.exe',
+                        'Intonaco-Wallpaper-Portable.exe',
+                        'Intonaco-Wallpaper.msixupload',
+                        'SHA256SUMS.txt')
+          foreach ($name in $expected) {
+            $asset = @($release.assets | Where-Object { $_.name -ceq $name })
+            if ($asset.Count -ne 1 -or $asset[0].size -le 0) {
+              throw "New release $tag is missing required downloadable file: $name"
+            }
+            Write-Host "Verified $name, $($asset[0].size) bytes"
+          }
+          if (@($release.assets).Count -ne $expected.Count) {
+            throw "New release has unexpected/duplicate assets; retaining old release."
+          }
+          # Owner requested the old original-publication-date release be removed.
+          # Do this ONLY after all new v2.2.0 files are publicly available.
+          $old = @(gh release list --limit 100 --json tagName |
+              ConvertFrom-Json | Where-Object { $_.tagName -ceq 'Intonaco-Wallpaper' })
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect existing releases.' }
+          if ($old.Count -gt 0) {
+            gh release delete Intonaco-Wallpaper --yes --cleanup-tag
+            if ($LASTEXITCODE -ne 0) {
+              throw 'New release is published but old release deletion failed.'
+            }
+            Write-Host 'Outdated release and old version-free tag deleted.'
+          }
+          Write-Host "Fresh official release published: $($release.html_url)"
+
