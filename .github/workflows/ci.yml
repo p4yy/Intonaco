@@ -29,11 +29,41 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Build Intonaco native GPU renderer (x64, no external app)
+        shell: pwsh
+        run: ./tools/Build-NativeVideo.ps1
+
       - name: Restore
         run: dotnet restore Intonaco.sln
 
+      - name: Verify bundled GPU renderer exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path src/Intonaco/native/Intonaco.Video.dll)) {
+            throw 'Standalone native video module was not built.'
+          }
+
       - name: Build
         run: dotnet build Intonaco.sln -c Release --no-restore
+
+      - name: Validate and test four-way performance benchmark
+        shell: pwsh
+        run: |
+          foreach ($file in @(
+              'tools/Compare-WallpaperPerformance.ps1',
+              'tools/Summarize-WallpaperBenchmarks.ps1',
+              'tools/Test-WallpaperBenchmarks.ps1')) {
+            $path = (Resolve-Path $file).Path
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $path, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors -and $parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Host "::error::$_" }
+              throw "$file has PowerShell syntax errors."
+            }
+          }
+          ./tools/Test-WallpaperBenchmarks.ps1
 
       - name: Test
         run: >-
@@ -85,6 +115,13 @@ jobs:
           dotnet publish src/Intonaco/Intonaco.csproj -c Release -r win-x64
           --self-contained true -o artifacts/installer-app
           /p:PublishSingleFile=false /p:PublishReadyToRun=true
+
+      - name: Verify standalone installer includes native GPU DLL
+        shell: pwsh
+        run: |
+          if (-not (Test-Path artifacts/installer-app/Intonaco.Video.dll)) {
+            throw 'GPU native DLL is missing from the standalone installer payload.'
+          }
 
       - name: Build and smoke test Windows installer
         shell: pwsh

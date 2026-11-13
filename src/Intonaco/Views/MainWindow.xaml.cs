@@ -102,13 +102,9 @@ namespace Intonaco.Views
         public MainWindow()
         {
             _settings = AppSettings.Load();
-            if (_settings.PlaybackBackend == "MPV" &&
-                !MpvWallpaperPlayer.TryLocateExecutable(out _))
-            {
-                DebugLog.Write("Saved MPV backend not installed; using Windows player.");
-                _settings.PlaybackBackend = "Windows";
-                _settings.Save();
-            }
+            // The bundled GPU engine is the default. Existing explicit
+            // Windows/Native compatibility selections remain respected.
+            // Old MPV preferences are normalized to GPU by AppSettings.
             _player = CreatePlayer(_settings.PlaybackBackend);
             _desktop = new DesktopIntegration();
             _fullscreenDetector = new FullscreenDetector();
@@ -164,8 +160,12 @@ namespace Intonaco.Views
             Math.Max(minHeight, Math.Min(1080, workAreaHeight - 24));
 
         private static IWallpaperPlayer CreatePlayer(string backend) =>
-            AppSettings.NormalizeBackend(backend) == "MPV"
-                ? new MpvWallpaperPlayer() : new WallpaperPlayer();
+            AppSettings.NormalizeBackend(backend) switch
+            {
+                "GPU" => new GpuVideoWallpaperPlayer(),
+                "Windows" => new WallpaperPlayer(),
+                _ => new NativeMfPlayWallpaperPlayer()
+            };
 
         private void ApplyPlayerSettings()
         {
@@ -193,14 +193,15 @@ namespace Intonaco.Views
 
         private void UpdateBackendInterface()
         {
-            bool mpv = _player is MpvWallpaperPlayer;
-            FpsComboBox.IsEnabled = !mpv;
-            FpsComboBox.ToolTip = mpv
-                ? "MPV uses the source's native frame cadence; the Windows FPS cap does not apply."
-                : "Preferred presentation frame rate.";
-            PreviewHintText.Text = mpv
-                ? "MPV shows the wallpaper on the desktop without a second decoder."
-                : "Drop a video here or choose a file";
+            // Playback follows the original source frame rate.
+            // WPF MediaElement has no reliable DesiredFrameRate control;
+            // the old preset dropdown is hidden rather than implying a cap.
+            FpsComboBox.IsEnabled = false;
+            PreviewHintText.Text = _player is GpuVideoWallpaperPlayer
+                ? "Original video quality, rendered directly on your desktop."
+                : _player is NativeMfPlayWallpaperPlayer
+                    ? "Built-in Windows video compatibility playback."
+                    : "Choose a video to make your desktop move.";
         }
 
         private void LoadSettings()
@@ -348,8 +349,22 @@ namespace Intonaco.Views
             };
             _placementTimer.Tick += (_, _) =>
             {
-                if (_isApplied)
-                    _desktop.EnsurePlacement();
+                if (!_isApplied)
+                    return;
+
+                _desktop.EnsurePlacement();
+                DisableOptionalPreviewIfOverBudget();
+                // Sample once per 45 seconds while playing, without forcing a
+                // GC or opening an extra decoder. Logs show whether the heavy
+                // RAM is in managed objects, native Media Foundation or mpv.
+                RuntimeMemoryDiagnostics.LogIfDue(
+                    _player is GpuVideoWallpaperPlayer ? "GPU-DirectX" :
+                        _player is MpvWallpaperPlayer ? "MPV" :
+                        _player is NativeMfPlayWallpaperPlayer ? "Native" : "Windows",
+                    _livePreviewEnabled && PreviewMedia.Source != null,
+                    _player.NaturalVideoWidth, _player.NaturalVideoHeight,
+                    _player is MpvWallpaperPlayer mpv
+                        ? mpv.HelperWorkingSetBytes : 0);
             };
             UpdateBackgroundTimers();
         }
@@ -361,8 +376,17 @@ namespace Intonaco.Views
 
             bool restore = _pendingWindowRestore;
             _pendingWindowRestore = false;
-            bool silent = _startMinimized && !restore;
+            bool recovering = Application.Current is App
+                { LastSessionEndedUnexpectedly: true };
+            bool silent = _startMinimized && !restore && !recovering;
             _startMinimized = false;
+            if (recovering)
+            {
+                // Show controls rather than silently re-creating the wallpaper
+                // after a crashed/killed process or machine freeze.
+                ShowInTaskbar = true;
+                DebugLog.Write("Unclean previous session: entering safe startup.");
+            }
 
             // A fully constructed and first-painted WPF window is safe to
             // hide and restore. SourceInitialized is too early.
@@ -384,6 +408,13 @@ namespace Intonaco.Views
 
         private void ScheduleStartupWallpaperAfterPaint()
         {
+            if (Application.Current is App { LastSessionEndedUnexpectedly: true })
+            {
+                DebugLog.Write("Safe startup: last wallpaper is NOT auto-played. User may select it manually.");
+                StatusText.Text = "Safe startup — automatic wallpaper playback skipped";
+                return;
+            }
+
             if (_startupWallpaperScheduled || !_settings.AutoPlay ||
                 string.IsNullOrWhiteSpace(_settings.LastWallpaperPath))
                 return;
@@ -789,6 +820,10 @@ namespace Intonaco.Views
             {
                 prepared = await NativeMediaEngine.PrepareAsync(
                     filePath, operation.Token);
+                // Shell window discovery and 0x052C requests can take seconds
+                // on an overloaded Explorer. Never run them on the WPF UI
+                // thread, and cancel older requests when users switch files.
+                await _desktop.PrepareDesktopLayerAsync(operation.Token);
             }
             catch (OperationCanceledException)
             {
@@ -1011,6 +1046,7 @@ namespace Intonaco.Views
             ++_previewThumbnailVersion;
             PreviewModeButton.Content = "Play live preview";
             PreviewModeButton.Visibility = _player is MpvWallpaperPlayer
+                or NativeMfPlayWallpaperPlayer or GpuVideoWallpaperPlayer
                 ? Visibility.Collapsed : Visibility.Visible;
             RefreshPreviewForCurrentState();
         }
@@ -1042,7 +1078,8 @@ namespace Intonaco.Views
         {
             // Shell thumbnails also work when the desktop uses MPV;
             // never start an additional Windows video decoder for MPV files.
-            if (_player is MpvWallpaperPlayer)
+            if (_player is MpvWallpaperPlayer or NativeMfPlayWallpaperPlayer
+                or GpuVideoWallpaperPlayer)
             {
                 _livePreviewEnabled = false;
                 PreviewModeButton.Visibility = Visibility.Collapsed;
@@ -1126,6 +1163,22 @@ namespace Intonaco.Views
                     : "Wallpaper plays on your desktop";
             }
 
+            // Explorer thumbnail providers can load a full 4K decoder
+            // transiently inside our process, even when the 480x270 image
+            // is never seen. Never make that request while Intonaco is in
+            // the tray or inactive: load only when the settings UI is open.
+            // Activation already calls RefreshPreviewForCurrentState().
+            if (!IsPreviewWindowVisible)
+                return;
+
+            // The OS thumbnail provider may open another 4K media decoder.
+            // During a GPU wallpaper switch the previous decoder may still
+            // be cleaning up and the new one is just starting. Never start
+            // a third decode before the newly selected wallpaper has opened.
+            // OnMediaOpened schedules the deferred preview once ready.
+            if (_player is GpuVideoWallpaperPlayer && !_lastVideoOpened)
+                return;
+
             if (!string.Equals(_thumbnailRequestedFor, _previewFilePath,
                 StringComparison.OrdinalIgnoreCase))
             {
@@ -1142,7 +1195,11 @@ namespace Intonaco.Views
             BitmapSource? image = null;
             try
             {
-                image = await VideoThumbnail.LoadAsync(filePath);
+                // When GPU playback is active, only retrieve an existing
+                // Windows thumbnail. A cache miss is cheaper than launching
+                // an entirely separate 4K decode for a 480px preview.
+                image = await VideoThumbnail.LoadAsync(filePath,
+                    cachedThumbnailOnly: _player is GpuVideoWallpaperPlayer);
             }
             catch (Exception ex)
             {
@@ -1159,10 +1216,48 @@ namespace Intonaco.Views
                 ShowStaticPreview();
         }
 
+        // The optional in-app video preview creates a SECOND decoder. It is
+        // never more important than the full-resolution desktop playback.
+        private const long OptionalPreviewPrivateMemoryBudget = 384L * 1024 * 1024;
+
+        private bool IsOptionalPreviewOverBudget()
+        {
+            try
+            {
+                using var process = Process.GetCurrentProcess();
+                process.Refresh();
+                return process.PrivateMemorySize64 >= OptionalPreviewPrivateMemoryBudget;
+            }
+            catch (InvalidOperationException) { return false; }
+            catch (Win32Exception) { return false; }
+        }
+
+        private void DisableOptionalPreviewIfOverBudget()
+        {
+            if (!_livePreviewEnabled || !IsOptionalPreviewOverBudget())
+                return;
+
+            _livePreviewEnabled = false;
+            ReleasePreviewPipeline();
+            ShowStaticPreview();
+            PreviewModeButton.Content = "Play live preview";
+            PreviewStatusText.Text = "Still preview — memory saver";
+            DebugLog.Write("Optional second video decoder disabled after exceeding 384 MiB private memory.");
+        }
+
         private void OnToggleLivePreview(object sender, RoutedEventArgs e)
         {
-            if (_previewFilePath == null || _player is MpvWallpaperPlayer)
+            if (_previewFilePath == null ||
+                _player is MpvWallpaperPlayer or NativeMfPlayWallpaperPlayer
+                    or GpuVideoWallpaperPlayer)
                 return;
+
+            if (!_livePreviewEnabled && IsOptionalPreviewOverBudget())
+            {
+                PreviewStatusText.Text = "Still preview — memory saver";
+                DebugLog.Write("Optional second video decoder skipped: already above 384 MiB private memory.");
+                return;
+            }
 
             _livePreviewEnabled = !_livePreviewEnabled;
             PreviewModeButton.Content = _livePreviewEnabled
@@ -1762,23 +1857,12 @@ namespace Intonaco.Views
             if (requested == _settings.PlaybackBackend)
                 return;
 
-            if (requested == "MPV" &&
-                !MpvWallpaperPlayer.TryLocateExecutable(out _))
-            {
-                _suppressEvents = true;
-                try { SelectComboByTag(BackendComboBox, _settings.PlaybackBackend); }
-                finally { _suppressEvents = false; }
-                ShowError("MPV is optional and not bundled. Install mpv from mpv.io, " +
-                    "put mpv.exe beside Intonaco.exe or add it to PATH, then choose MPV again.");
-                return;
-            }
-
             string? activeFile = _activeOriginalFile;
             bool wasPaused = _player.CurrentState == WallpaperPlayer.PlaybackState.Paused;
             TimeSpan position = _player.Position;
 
-            // Release one backend fully before activating the next. Never
-            // retain two desktop decoders or orphaned MPV processes.
+            // Release the current decoder before enabling the next engine.
+            // Every selectable engine is already bundled with Windows/Intonaco.
             ++_wallpaperRequestVersion;
             _preparationCancellation?.Cancel();
             StopWallpaper();
@@ -1807,34 +1891,20 @@ namespace Intonaco.Views
             {
                 _settings.TargetFps = fps;
                 _player.TargetFps = fps;
-                ApplyPreviewFrameRateCap(fps);
                 _settings.Save();
                 DebugLog.Write(
-                    $"Frame rate changed to {fps} fps; desktop cap " +
-                    $"{(fps >= 60 ? "cleared" : fps + " fps")} and preview cap re-applied.");
+                    $"FPS preference saved as {fps}; native decoder follows the source cadence (no artificial FPS cap).");
             }
         }
 
         /// <summary>
-        /// Mirrors the desktop player's frame-rate cap onto the in-app preview
-        /// so the two never present at different rates. 60 fps clears the cap.
+        /// WPF MediaElement does not expose a safe frame-rate limiter. This
+        /// compatibility method is intentionally a no-op: applying the
+        /// Timeline attached property throws an InvalidCastException.
         /// </summary>
         private void ApplyPreviewFrameRateCap(int fps)
         {
-            try
-            {
-                if (fps >= 60)
-                    PreviewMedia.ClearValue(
-                        System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty);
-                else
-                    PreviewMedia.SetValue(
-                        System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty,
-                        Math.Clamp(fps, 1, 60));
-            }
-            catch (Exception ex)
-            {
-                DebugLog.Write($"Preview frame-rate cap failed: {ex.Message}");
-            }
+            // Source cadence remains unchanged; no hidden re-encoding.
         }
 
         private void OnFitChanged(object sender, SelectionChangedEventArgs e)
@@ -2063,20 +2133,11 @@ namespace Intonaco.Views
         {
             if (_isExiting) return;
 
-            string detail;
-            if (_player is MpvWallpaperPlayer)
-            {
-                detail = "MPV could not play this video. Verify your optional MPV " +
-                    "installation and its supported codecs. Details: " + message;
-            }
-            else
-            {
-                detail = NativeMediaEngine.IsLikelyDecoderFailure(message)
-                    ? NativeMediaEngine.CodecHelp +
-                        " You can also select the optional MPV backend in Playback settings. " +
-                        "Details: " + message
-                    : message;
-            }
+            string detail = NativeMediaEngine.IsLikelyDecoderFailure(message)
+                ? NativeMediaEngine.CodecHelp +
+                  " Try the Windows compatibility engine in Playback settings. " +
+                  "Details: " + message
+                : message;
 
             NotifyPlaybackError(detail);
             // If this video cannot be decoded, restore the previous source
@@ -2133,9 +2194,15 @@ namespace Intonaco.Views
 
         private void OnMediaOpened(TimeSpan duration)
         {
+            // Decoder events are posted asynchronously. If the owner changes
+            // wallpaper before this callback reaches WPF, an old MediaOpened
+            // must not mark the *new* source as ready or trigger a second
+            // thumbnail extraction while the new GPU session is starting.
+            int requestVersion = _wallpaperRequestVersion;
             Dispatcher.BeginInvoke(() =>
             {
-                if (!_isApplied) return;
+                if (!_isApplied || requestVersion != _wallpaperRequestVersion)
+                    return;
 
                 // MediaElement can misinterpret broken MP4 pixel-aspect data:
                 // e.g. report 232x2160 for a genuine 3840x2160 video. Never
@@ -2173,6 +2240,13 @@ namespace Intonaco.Views
                 FileInfoText.Text = info;
                 RefreshRecentWallpapers();
                 RefreshSeekProgress();
+
+                // Only after native playback opens may the optional Shell
+                // thumbnail provider start. It must not overlap decoder
+                // teardown and the following wallpaper's startup.
+                if (_player is GpuVideoWallpaperPlayer &&
+                    IsPreviewWindowVisible && _previewFilePath != null)
+                    ShowStaticPreview();
             });
         }
 

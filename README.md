@@ -30,8 +30,8 @@
 - **Video on the desktop.** Uses the Windows WorkerW/Progman layers to stay behind your icons.
 - **Local files.** Choose or drag and drop a video; revisit your last six wallpapers.
 - **Quiet playback.** Tray controls for play, pause, volume and exit.
-- **Respectful of resources.** Pausing stops the media clock without losing the last frame. Hiding the settings window releases its separate live-preview decoder.
-- **Practical controls.** Fit, speed, preferred frame rate, looping, auto-pause and startup behavior.
+- **Deep pause.** The integrated GPU engine releases the video decoder after pausing while retaining the last full-quality desktop frame.
+- **Clear controls.** A refreshed icon-led interface provides fit, speed, source-frame-rate playback, looping, focus-aware auto-pause and startup settings.
 - **System-aware.** Responds to fullscreen applications, desktop focus, power events and Explorer restarts.
 
 No accounts, wallpaper storefront, embedded browser, telemetry SDK or background service.
@@ -60,26 +60,18 @@ provider when possible.
 
 **Common containers:** MP4, M4V, MOV, MKV, WebM, AVI, WMV, ASF, MPEG, MPEG-TS, M2TS and 3GP. Intonaco also allows opening uncommon video containers such as FLV, OGV, RMVB and MXF, but **those are not guaranteed to play**. Both container support and the video/audio codec must be available through Windows Media Foundation. MKV is a container, not a codec.
 
-- **Small default build:** MPV/FFmpeg libraries are not bundled; Windows Media Foundation plays videos with no external playback process.
+- **Standalone GPU engine:** Intonaco's integrated Direct3D 11 / Windows Media Foundation video renderer is selected by default. No external playback executable is required.
 - **No quality loss:** normal playback reads the original file; the rare MP4 aspect-ratio repair modifies only metadata in a separate cached copy, leaving video samples and your original file unchanged.
 - **Safe by default:** no automatic lossy transcode; unsupported codecs produce a clear explanation, and Intonaco can restore the last working wallpaper rather than leaving a black desktop.
-- **Video-only input:** animated GIF, animated WebP and APNG are not yet supported by the native video renderer. The MPV backend is intended for video formats, not animated image playback.
+- **Video-only input:** animated GIF, animated WebP and APNG are not yet supported by the integrated video renderer.
 
-**Important:** A small native app cannot decode *every codec* on its own. For maximum compatibility without optional components, use **H.264 MP4**. For other containers, install compatible Windows codecs or enable the optional MPV player described below.
+**Important:** Video decoding support depends on Windows codecs, media format and graphics drivers. For widest built-in compatibility, use **H.264 MP4**. You can choose the included **Native compatibility** or **Windows compatibility** renderer if the GPU renderer cannot play a file.
 
-## Optional MPV backend
+## Integrated video engine
 
-If Windows cannot decode an MKV, WebM, AVI or other video, Intonaco can use a **separately installed MPV media player**. MPV uses FFmpeg libraries internally; Intonaco **does not bundle them or add them to the native build**.
+**Intonaco GPU** is the default. It uses the original Direct3D 11 and Windows Media Foundation playback path with direct GPU frame presentation, deep pause and controlled decoder handoff during wallpaper changes. No media-player installation or separate decoding application is required.
 
-1. Download a Windows MPV build from [mpv.io/installation](https://mpv.io/installation/) or an official linked Windows provider.
-2. Keep the MPV installation together with its required DLL files. Add the folder containing `mpv.exe` to your system `PATH`, put the complete portable MPV distribution beside Intonaco, or set `INTONACO_MPV` to the full path of `mpv.exe`.
-3. Open **Playback settings → Video engine → MPV (optional)**. Selecting MPV without a detectable executable leaves Windows selected and explains what is missing.
-
-The MPV player is embedded as a native child of the existing desktop wallpaper window. Play, pause, resume, seek, volume, loop and aspect-preserving Fill/Fit use local JSON IPC. Hardware decoding is requested when supported by the GPU and MPV installation.
-
-**Resource-saving behavior:** only one desktop backend runs at a time. The MPV setting prevents a second Windows video decoder from being started for the settings preview. There is no continuously running conversion process and no MPV process at all in Windows mode. MPV uses the source's frame cadence; the Windows-mode FPS preference does not apply to MPV.
-
-Native Windows remains the default. Video engine compatibility, output quality and CPU/GPU usage should be measured on your machine before choosing one for daily use. The installer remains independent of MPV, so you can always use Intonaco without it.
+**Native compatibility** and **Windows compatibility** remain available in Playback settings for graphics hardware or media configurations that need a fallback. Colors, video smoothness, and RAM usage depend on the source codec and Windows GPU driver. Some 4K H.264 files may use more than 100 MB of RAM while playing.
 
 ## Use
 
@@ -87,7 +79,7 @@ Native Windows remains the default. Video engine compatibility, output quality a
    The default **still preview** uses a video thumbnail to reduce CPU/GPU
    usage while the desktop wallpaper animates. Select **Play live preview**
    if you explicitly want motion in the control window too.
-2. Choose fit, volume, preferred frame rate and looping.
+2. Choose fit, volume, playback speed and looping. The original video frame rate is preserved.
 3. Minimize to the system tray. The desktop wallpaper continues without the second preview decoder.
 4. Pause from the tray when you want a still frame without changing your desktop.
 
@@ -121,18 +113,18 @@ Resource use depends on codec, resolution, GPU, monitor configuration and Window
 .\tools\Measure-IntonacoPerformance.ps1 -Label "Paused" -DurationSeconds 20
 ```
 
-**Paused video stays open by design.** The original MediaElement retains its native frame to prevent black borders and flicker. A full garbage collection cannot release that native decoder, so the app avoids a blocking collection on pause.
+**Deep pause:** after the first GPU-presented frame, pausing releases the Media Foundation decoder while retaining the still image on the DXGI swap chain. The original video is not downscaled or re-encoded. Memory is source/driver dependent; do not assume every 4K file stays under 100 MB.
 
 ## Microsoft Store
 
-The release includes a separately built and validated `.msixupload` file with
+The official GitHub release includes an independently built and validated **unsigned** `.msixupload` file with
 the registered **Acev Apps Co.** package identity. Upload it in Microsoft
 Partner Center for certification; building the file does not publish the app.
 See the [Store submission checklist](docs/MICROSOFT_STORE.md).
 
 ## Project
 
-**Find live wallpapers:** The app's collapsed **Get live wallpapers** section contains six independent sources. Press **Copy link** to copy a source address, paste it into your preferred browser, download a compatible local video, and open that file in Intonaco Wallpaper. The app does not automatically redirect, stream, scrape, or download third-party content. Always check the content's license.
+**Find live wallpapers:** The app's collapsed **Discover wallpapers** section contains six independent sources. Press **Copy link** to copy a source address, paste it into your preferred browser, download a compatible local video, and open that file in Intonaco Wallpaper. The app does not automatically redirect, stream, scrape, or download third-party content. Always check the content's license.
 
 [Source](src/Intonaco) · [Tests](tests/Intonaco.Tests) · [Changelog](CHANGELOG.md) · [Brand](docs/branding) · [Demo](docs/demo) · [Issues](https://github.com/p4yy/Intonaco/issues)
 

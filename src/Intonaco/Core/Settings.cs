@@ -22,7 +22,12 @@ namespace Intonaco.Core
         public bool IsMuted { get; set; } = true;
         public double Volume { get; set; } = 0.0;
         public int TargetFps { get; set; } = 30;
-        public string PlaybackBackend { get; set; } = "Windows"; // "Windows" or "MPV"
+        // GPU is Intonaco's integrated Direct3D11/Media Foundation player.
+        // Native and Windows remain local compatibility paths for older GPUs.
+        public string PlaybackBackend { get; set; } = "GPU"; // "GPU", "Native", "Windows"
+        // Legacy configuration key retained solely to read old settings.json files.
+        // No external playback executable is required or exposed in the UI.
+        public string? MpvExecutablePath { get; set; }
         public string WallpaperFit { get; set; } = "Fill"; // "Fill", "Fit", "Stretch"
         public double PlaybackSpeed { get; set; } = 1.0;
         public bool LoopPlayback { get; set; } = true;
@@ -80,9 +85,13 @@ namespace Intonaco.Core
                 ? ContinueWhenUnfocusedMode
                 : PauseWhenUnfocusedMode;
 
+        // Legacy MPV and unknown values migrate to the bundled GPU renderer.
+        // A user who explicitly chose a compatibility renderer keeps it.
         internal static string NormalizeBackend(string? backend) =>
-            string.Equals(backend, "MPV", StringComparison.OrdinalIgnoreCase)
-                ? "MPV" : "Windows";
+            string.Equals(backend, "Windows", StringComparison.OrdinalIgnoreCase)
+                ? "Windows" :
+            string.Equals(backend, "Native", StringComparison.OrdinalIgnoreCase)
+                ? "Native" : "GPU";
 
         internal static string NormalizeFit(string? fit)
         {
@@ -106,6 +115,8 @@ namespace Intonaco.Core
                 : Math.Clamp(PlaybackSpeed, 0.25, 2.0);
             WallpaperFit = NormalizeFit(WallpaperFit);
             PlaybackBackend = NormalizeBackend(PlaybackBackend);
+            MpvExecutablePath = string.IsNullOrWhiteSpace(MpvExecutablePath)
+                ? null : MpvExecutablePath.Trim();
             BackgroundAnimationMode = NormalizeBackgroundAnimationMode(BackgroundAnimationMode);
 
             // The new mode is the single source of truth. Keep the two legacy

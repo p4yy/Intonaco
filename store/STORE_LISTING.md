@@ -11,7 +11,7 @@ to the GitHub installer or require GitHub to install or update the app.
 - **Store ID:** `9PBBDCR0C6LH`
 - **Category suggestion:** Personalization
 - **Platform:** Windows desktop, x64
-- **Application version:** 2.1.2.0 (Store MSIX version; once verified)
+- **Application version:** 2.2.0.0 (Store MSIX, checked by Windows packaging workflow)
 - **Pricing:** Set explicitly in Partner Center; do not assume free
 - **Rating/content declaration:** Answer Partner Center's questionnaire accurately
 - **Privacy policy URL:** https://github.com/p4yy/Intonaco/blob/main/docs/PRIVACY.md (valid after the Store PR is merged)
@@ -30,9 +30,9 @@ keep your preferred setup between sessions.
 
 **Features**
 - Play supported video files as desktop wallpapers.
-- Preview wallpapers and quickly return to recently used files.
-- Choose fit, playback speed, looping, mute, and volume.
-- Decide whether animation pauses while another app is in focus.
+- A clean icon-led interface for choosing, managing and revisiting wallpapers.
+- Choose fit, playback speed, looping, mute, and volume. Play at the original source frame rate.
+- Conserve resources with integrated GPU playback and a deep-pause still frame; decide whether to pause when another app is active.
 - Resume your previous wallpaper and optionally start with Windows.
 - Explore popular independent wallpaper-video websites using copyable links.
 
@@ -41,15 +41,17 @@ copies website addresses to your clipboard; it doesn't fetch, scrape,
 automatically redirect, download, or distribute other creators' wallpapers.
 Third-party websites have their own licensing terms.
 
-Video formats, smoothness, and resource usage vary by Windows hardware and
-the installed media capabilities. The standard Windows playback engine is
-built in; an optional MPV engine may be used when separately installed.
+Video formats, smoothness, and resource usage vary by Windows hardware,
+video codec and installed media capabilities. The integrated Intonaco GPU
+engine and Windows compatibility engines are included; no additional media
+player is needed. High-resolution H.264 sources may use additional RAM.
 
-## What's new in 2.1.2
-- New compact section with copyable wallpaper source addresses.
-- More reliable opening of the app from desktop and Start menu shortcuts.
-- Cleaner wallpaper history layout for the narrow default window.
-- Consistent Intonaco Wallpaper app branding and company metadata.
+## What's new in 2.2.0
+- Redesigned icon-led wallpaper library, playback settings and preferences.
+- Intonaco's integrated GPU video renderer is now the default.
+- Deep pause retains the last frame while releasing decoder resources.
+- Improved video switching and decoder handoff, with no overlapping GPU decoders.
+- Removed experimental labels and legacy external-player setup controls.
 
 ## Store submission requirements
 1. The product identity was provided from Partner Center and is recorded in `store/partner-center-identity.json`.

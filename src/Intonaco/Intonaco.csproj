@@ -13,9 +13,9 @@
     <Company>Acev Dev Co</Company>
     <Copyright>Copyright © 2026 Intonaco Contributors</Copyright>
     <Authors>Intonaco Contributors</Authors>
-    <Version>2.1.4</Version>
-    <AssemblyVersion>2.1.4.0</AssemblyVersion>
-    <FileVersion>2.1.4.0</FileVersion>
+    <Version>2.2.0</Version>
+    <AssemblyVersion>2.2.0.0</AssemblyVersion>
+    <FileVersion>2.2.0.0</FileVersion>
     <!-- RuntimeIdentifier / SelfContained are supplied by publish commands
          (build.ps1, CI) so plain `dotnet build` / `dotnet test` stay RID-agnostic. -->
     <PublishSingleFile>true</PublishSingleFile>
@@ -54,6 +54,15 @@
 
   <ItemGroup>
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
+  </ItemGroup>
+
+  <!-- The original GPU renderer is compiled from native/IntonacoVideo on
+       Windows build agents. Native binary is carried inside our own installer
+       and the portable single-file build; users install no other app. -->
+  <ItemGroup Condition="Exists('native\Intonaco.Video.dll')">
+    <Content Include="native\Intonaco.Video.dll" Link="Intonaco.Video.dll"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

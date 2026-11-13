@@ -37,6 +37,10 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=Intonaco-Wallpaper" >> $env:GITHUB_OUTPUT
 
+      - name: Build Intonaco native GPU renderer (x64, no external app)
+        shell: pwsh
+        run: ./tools/Build-NativeVideo.ps1
+
       - name: Restore
         run: dotnet restore Intonaco.sln
 
@@ -59,6 +63,12 @@ jobs:
           /p:Version=${{ steps.version.outputs.version }}
           /p:PublishSingleFile=false /p:PublishReadyToRun=true
 
+      - name: Verify native video renderer in release payload
+        shell: pwsh
+        run: |
+          if (-not (Test-Path publish/installer-app/Intonaco.Video.dll)) {
+            throw 'Release is missing GPU renderer. Do not publish.'
+          }
       - name: Create and smoke-test EXE installer
         shell: pwsh
         run: |
@@ -143,15 +153,25 @@ jobs:
             - **Intonaco-Wallpaper-Portable.exe** — self-contained portable executable.
             - **Intonaco-Wallpaper.msixupload** — Microsoft Store Partner Center package.
 
-            Fixes include deferred startup playback, smoother window rendering,
-            desktop-shortcut restoration, and reduced preview decoder overhead.
+            Intonaco Wallpaper 2.2.0 — official Windows x64 release.
 
-            The Store package uses the registered Acev Apps Co. identity.
-            Submission and certification are handled in Microsoft Partner Center.
+            - Refined wallpaper library and settings interface with clear Fluent icons.
+            - Built-in Intonaco GPU (Direct3D 11 / Media Foundation) is now the default.
+            - Deep pause releases the decoder while retaining the last wallpaper frame.
+            - Controlled 4K decoder handoff when switching wallpapers.
+            - Original source colors, full-resolution video and compatibility options.
+            - No external playback application is required.
+
+            The Microsoft Store .msixupload uses the registered Acev Apps Co.
+            package identity and is **unsigned**. Upload it via Microsoft Partner
+            Center; Microsoft Store submission and certification are separate.
             Some proprietary MLW variants may still require their original player.
 
-            Both Windows binaries are unsigned, so SmartScreen may warn until
-            the developer provides trusted Authenticode signatures.
+            Source codec and hardware affect performance; no universal under-100 MB
+            or zero-lag guarantee is claimed.
+
+            Both GitHub EXEs are unsigned; Windows SmartScreen may warn.
+            Microsoft signs qualifying MSIX packages during Store certification.
           files: |
             release/*.exe
             release/*.msixupload

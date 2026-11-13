@@ -553,17 +553,32 @@ namespace Intonaco.Core
         /// background thread, so the WPF control window remains responsive.
         /// Only Attach(Window) touches the actual WPF wallpaper surface.
         /// </summary>
+        // Only one caller may request Explorer's undocumented desktop split at
+        // a time. Overlapping startup/selection/recovery requests can race and
+        // repeatedly rearrange Explorer windows.
+        private static readonly SemaphoreSlim SplitPreparationGate = new(1, 1);
+
         public Task PrepareDesktopLayerAsync(CancellationToken cancellationToken)
         {
-            return Task.Run(() =>
+            return Task.Run(async () =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (_disposed)
-                    return;
+                await SplitPreparationGate.WaitAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (_disposed)
+                        return;
 
-                DesktopSnapshot snapshot = CaptureDesktopState();
-                if (snapshot.Progman != IntPtr.Zero)
-                    EnsureDesktopSplit(snapshot);
+                    DesktopSnapshot snapshot = CaptureDesktopState();
+                    if (snapshot.Progman != IntPtr.Zero)
+                        EnsureDesktopSplit(snapshot);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                finally
+                {
+                    SplitPreparationGate.Release();
+                }
             }, cancellationToken);
         }
 
@@ -598,6 +613,9 @@ namespace Intonaco.Core
             LastError = null;
             Detach();
 
+            // No shell split requests or multi-second WorkerW polling on the
+            // WPF dispatcher. The caller prepares Explorer asynchronously.
+            // A failed preparation must fail gracefully rather than hang UI.
             var snapshot = CaptureDesktopState();
             if (snapshot.Progman == IntPtr.Zero)
             {
@@ -606,7 +624,12 @@ namespace Intonaco.Core
                 return false;
             }
 
-            snapshot = EnsureDesktopSplit(snapshot);
+            if (!snapshot.HasDesktopSplit && snapshot.Layout != DesktopLayout.RaisedProgman)
+            {
+                LastError = "Windows has not prepared its wallpaper layer. Try again after Explorer is ready.";
+                DebugLog.Write("Attach skipped: no WorkerW wallpaper layer; no blocking shell setup on the UI thread.");
+                return false;
+            }
             LogSnapshot(snapshot);
             bool raised = snapshot.Layout == DesktopLayout.RaisedProgman;
 
