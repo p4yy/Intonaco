@@ -36,6 +36,7 @@ param(
     [string]$PlaybackState = 'Playing',
     [ValidateRange(0, 2147483647)]
     [int]$RootProcessId = 0,
+    [int[]]$ExtraProcessIds = @(),
     [switch]$IncludeGpuCounters,
     [string]$OutputCsv,
     [string]$OutputJson,
@@ -47,7 +48,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Get-AppProcessSnapshot {
-    param([string]$Name, [int]$ExplicitRoot = 0)
+    param([string]$Name, [int]$ExplicitRoot = 0, [int[]]$AdditionalRoots = @())
 
     # Query the process family once per sample. Most playback backends use
     # out-of-process decoders; these cannot be ignored in a fair comparison.
@@ -71,7 +72,7 @@ function Get-AppProcessSnapshot {
             $item.Name -in @('wallpaper32.exe', 'wallpaper64.exe',
                 'webwallpaper32.exe', 'ui32.exe', 'ui64.exe')
         }
-        if ($isRoot) {
+        if ($isRoot -or [int]$item.ProcessId -in $AdditionalRoots) {
             [void]$ids.Add([int]$item.ProcessId)
         }
     }
@@ -189,8 +190,11 @@ $machineId = "$env:COMPUTERNAME / $([Environment]::ProcessorCount) logical CPUs"
 Write-Host "Preparing $App ($PlaybackState); video=$videoName; SHA256=$videoHash."
 Write-Host "Press Win+D during warmup. Compare identical files and identical display/HDR conditions."
 if ($RootProcessId) { Write-Host "Tracking explicit root process ID $RootProcessId and its children." }
+if ($ExtraProcessIds.Count -gt 0) {
+    Write-Host "Including verified orphan helper PIDs: $($ExtraProcessIds -join ', ')"
+}
 if ($WarmupSeconds -gt 0) { Start-Sleep -Seconds $WarmupSeconds }
-$previous = Get-AppProcessSnapshot -Name $App -ExplicitRoot $RootProcessId
+$previous = Get-AppProcessSnapshot -Name $App -ExplicitRoot $RootProcessId -AdditionalRoots $ExtraProcessIds
 $lastTime = Get-Date
 $samples = @()
 $intervalSeconds = $SampleIntervalSeconds
@@ -199,7 +203,7 @@ $iterations = [math]::Ceiling($DurationSeconds / $intervalSeconds)
 for ($i = 0; $i -lt $iterations; $i++) {
     Start-Sleep -Seconds $intervalSeconds
     $now = Get-Date
-    $current = Get-AppProcessSnapshot -Name $App -ExplicitRoot $RootProcessId
+    $current = Get-AppProcessSnapshot -Name $App -ExplicitRoot $RootProcessId -AdditionalRoots $ExtraProcessIds
     $elapsed = ($now - $lastTime).TotalSeconds
     $cpuDelta = [math]::Max(0.0, $current.CpuSeconds - $previous.CpuSeconds)
     $cpuPercent = if ($elapsed -gt 0) {
