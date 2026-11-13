@@ -33,6 +33,10 @@ namespace Intonaco.Core
             public double DurationSeconds;
             public double PositionSeconds;
             public long FramesPresented;
+            public long GpuLocalBytes;
+            public long GpuNonLocalBytes;
+            public long GpuLocalBudgetBytes;
+            public long GpuNonLocalBudgetBytes;
         }
 
         private static class Native
@@ -338,6 +342,18 @@ namespace Intonaco.Core
                             .ToString("F1", CultureInfo.InvariantCulture) +
                     " privateMiB=" +
                         (process.PrivateMemorySize64 / 1048576.0)
+                            .ToString("F1", CultureInfo.InvariantCulture) +
+                    " dxgiLocalMiB=" +
+                        (stats.GpuLocalBytes / 1048576.0)
+                            .ToString("F1", CultureInfo.InvariantCulture) +
+                    " dxgiNonLocalMiB=" +
+                        (stats.GpuNonLocalBytes / 1048576.0)
+                            .ToString("F1", CultureInfo.InvariantCulture) +
+                    " dxgiLocalBudgetMiB=" +
+                        (stats.GpuLocalBudgetBytes / 1048576.0)
+                            .ToString("F1", CultureInfo.InvariantCulture) +
+                    " dxgiNonLocalBudgetMiB=" +
+                        (stats.GpuNonLocalBudgetBytes / 1048576.0)
                             .ToString("F1", CultureInfo.InvariantCulture) +
                     " decoderReleased=" + decoderSleeping +
                     " source=" + stats.Width + "x" + stats.Height);
