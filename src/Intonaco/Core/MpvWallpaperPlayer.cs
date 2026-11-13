@@ -53,8 +53,18 @@ namespace Intonaco.Core
             _positionTimestamp = Stopwatch.GetTimestamp();
         }
 
+        // User-selected external MPV player. The app never copies, bundles,
+        // downloads or launches an unrelated executable without selection.
+        internal static string? ConfiguredExecutablePath { get; set; }
+
         public static bool TryLocateExecutable(out string executable)
         {
+            if (IsValidExecutable(ConfiguredExecutablePath))
+            {
+                executable = Path.GetFullPath(ConfiguredExecutablePath!);
+                return true;
+            }
+
             string? fromEnvironment = Environment.GetEnvironmentVariable("INTONACO_MPV");
             if (IsValidExecutable(fromEnvironment))
             {
