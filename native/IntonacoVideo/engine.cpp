@@ -223,7 +223,13 @@ namespace
                     if (FAILED(hr)) { fail(hr); goto done; }
 
                     ComPtr<IMFAttributes> attrs;
-                    hr = MFCreateAttributes(&attrs, 2);
+                    hr = MFCreateAttributes(&attrs, 3);
+                    if (FAILED(hr)) { fail(hr); goto done; }
+                    // Mandatory in IMFMediaEngine FRAME-SERVER mode.
+                    // Without this attribute the engine can initialize in
+                    // audio-only mode or fail, even when D3D11 is available.
+                    hr = attrs->SetUINT32(MF_MEDIA_ENGINE_VIDEO_OUTPUT_FORMAT,
+                        static_cast<UINT32>(DXGI_FORMAT_B8G8R8A8_UNORM));
                     if (FAILED(hr)) { fail(hr); goto done; }
                     hr = attrs->SetUnknown(MF_MEDIA_ENGINE_DXGI_MANAGER,
                         dxgiManager.Get());
