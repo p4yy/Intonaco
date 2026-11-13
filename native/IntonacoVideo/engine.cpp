@@ -427,6 +427,13 @@ namespace
                         const bool wantedMute = s->mute.load();
                         const bool wantedLoop = s->loop.load();
                         const bool wantedPause = s->pause.load();
+                        // A pause requested before the very first decoded
+                        // frame must not leave a black desktop. Let the
+                        // hardware decoder present exactly one frame before
+                        // its clock is paused and deep pause releases it.
+                        // Subsequent pauses never run an extra frame.
+                        const bool needsInitialStill =
+                            wantedPause && s->frames.load() == 0;
                         const bool wantedFill = s->fill.load();
                         const double wantedVolume = s->volume.load();
                         const double wantedSpeed = s->speed.load();
@@ -547,7 +554,8 @@ namespace
                             }
                         }
 
-                        if (begun && wantedPause != lastPause)
+                        if (begun && wantedPause != lastPause &&
+                            !needsInitialStill)
                         {
                             if (wantedPause)
                             {
@@ -643,7 +651,8 @@ namespace
 
                         // No CompositionTarget.Rendering, WPF bitmaps or
                         // expensive CPU readback. Present only decoded frames.
-                        if (begun && s->loaded.load() && !wantedPause)
+                        if (begun && s->loaded.load() &&
+                            (!wantedPause || needsInitialStill))
                         {
                             LONGLONG presentationTime = 0;
                             HRESULT tick = player->OnVideoStreamTick(&presentationTime);
@@ -857,7 +866,11 @@ extern "C"
             // A hung graphics driver must not lock the Intonaco UI forever.
             // The worker owns all its state and can finish cleanup later.
             HANDLE threadHandle = static_cast<HANDLE>(engine->worker.native_handle());
-            DWORD result = WaitForSingleObject(threadHandle, 1500);
+            // The old 1500-ms UI-thread wait caused obvious hiccups on
+            // quick wallpaper changes. A bounded 200-ms wait preserves
+            // WPF responsiveness; the ActiveDecoderLease above prevents
+            // a new decoder starting before the detached worker finishes.
+            DWORD result = WaitForSingleObject(threadHandle, 200);
             if (result == WAIT_OBJECT_0)
                 engine->worker.join();
             else

@@ -303,6 +303,72 @@ namespace Intonaco.Tests
         }
 
         [Fact]
+        public void ImmediatePause_PresentsAFullQualityFrameBeforeDecoderDeepSleep()
+        {
+            // In WPF startup restore and fast manual pause, the video may not
+            // yet have produced its first picture. Never pause the decoder
+            // before the first DXGI frame is shown, otherwise the wallpaper
+            // can stay black indefinitely without an error.
+            string? engine = null;
+            for (var dir = new DirectoryInfo(AppContext.BaseDirectory);
+                 dir != null; dir = dir.Parent)
+            {
+                string file = Path.Combine(dir.FullName,
+                    "native", "IntonacoVideo", "engine.cpp");
+                if (File.Exists(file)) { engine = File.ReadAllText(file); break; }
+            }
+
+            Assert.NotNull(engine);
+            Assert.Contains("const bool needsInitialStill", engine!);
+            Assert.Contains("wantedPause && s->frames.load() == 0", engine!);
+            Assert.Contains("wantedPause != lastPause &&", engine!);
+            Assert.Contains("!needsInitialStill)", engine!);
+            Assert.Contains("(!wantedPause || needsInitialStill)", engine!);
+            Assert.Contains("s->frames.fetch_add(1)", engine!);
+            Assert.Contains("DeepPauseDelay", engine!);
+            Assert.DoesNotContain("EmptyWorkingSet", engine!);
+        }
+
+        [Fact]
+        public void WallpaperSwitch_HasBoundedUiWaitAndSerialNativeGpuLifetime()
+        {
+            string? engine = null;
+            for (var dir = new DirectoryInfo(AppContext.BaseDirectory);
+                 dir != null; dir = dir.Parent)
+            {
+                string file = Path.Combine(dir.FullName,
+                    "native", "IntonacoVideo", "engine.cpp");
+                if (File.Exists(file)) { engine = File.ReadAllText(file); break; }
+            }
+            Assert.NotNull(engine);
+            Assert.Contains("WaitForSingleObject(threadHandle, 200)", engine!);
+            Assert.Contains("ActiveDecoderLease.try_lock_for", engine!);
+            Assert.Contains("engine->worker.detach()", engine!);
+            Assert.DoesNotContain("WaitForSingleObject(threadHandle, 1500)", engine!);
+        }
+
+        [Fact]
+        public void ProcessFamilyBenchmark_IncludesAutoWallAndLively()
+        {
+            string? code = null;
+            for (var dir = new DirectoryInfo(AppContext.BaseDirectory);
+                 dir != null; dir = dir.Parent)
+            {
+                string file = Path.Combine(dir.FullName,
+                    "tools", "Compare-WallpaperPerformance.ps1");
+                if (File.Exists(file)) { code = File.ReadAllText(file); break; }
+            }
+            Assert.NotNull(code);
+            Assert.Contains("'Intonaco', 'Lively', 'AutoWall'", code!);
+            Assert.Contains("$Name -eq 'Lively'", code!);
+            Assert.Contains("$item.Name -like 'AutoWall*'", code!);
+            Assert.Contains("$item.Name -like 'weebp*'", code!);
+            Assert.Contains("ParentProcessId", code!);
+            Assert.Contains("PrivateMemoryMB", code!);
+            Assert.Contains("CpuPercent", code!);
+        }
+
+        [Fact]
         public void OriginalVideoModule_HasAllExpectedNativeExports()
         {
             if (!OperatingSystem.IsWindows())

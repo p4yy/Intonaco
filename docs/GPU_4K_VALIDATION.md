@@ -36,19 +36,28 @@ These are not guaranteed baselines across different Windows hardware.
    seeking to the wrong position, frame skips, or runaway RAM after several
    loops. Test the 4K HEVC video as well.
 6. Let each file play for 10 minutes. Record steady-state and peak RAM,
-   CPU and GPU. Compare both modes to Lively with exactly the same video;
-   include **all** playback helpers/players in both process families.
+   CPU and GPU. Compare **Intonaco, Lively and AutoWall separately** with
+   exactly the same wallpaper and display settings; include **all** playback
+   helpers/players in each process family. AutoWall may use mpv/weebp
+   subprocesses that must not be excluded from its totals.
 7. Open `%LocalAppData%\Intonaco\debug.log` and check
    `GPU playback sample:` for **framePresentationFps**, RAM and pause
    state. FPS is the **actual number of frames submitted to DXGI** over
    15 seconds; it is not the decoded source FPS or an invented FPS limit.
    `GPU warning: no new frame presented for 15 seconds` indicates a
    renderer or codec problem and should be reported.
-8. Run the optional Windows PowerShell process-family check separately
-   for Lively and Intonaco:
-   `./tools/Compare-WallpaperPerformance.ps1 -App Intonaco -DurationSeconds 120 -EnforceRamTarget`
-   A failure means the *working set* did not remain below 100 MiB. It
-   does not mean there was a crash. GPU memory must be checked separately.
+8. Run the Windows PowerShell process-family checks with **only the
+   named wallpaper engine running** (not all three at once):
+   `./tools/Compare-WallpaperPerformance.ps1 -App Intonaco -DurationSeconds 120 -EnforceRamTarget -OutputCsv intonaco.csv`
+   `./tools/Compare-WallpaperPerformance.ps1 -App Lively -DurationSeconds 120 -OutputCsv lively.csv`
+   `./tools/Compare-WallpaperPerformance.ps1 -App AutoWall -DurationSeconds 120 -OutputCsv autowall.csv`
+   A failed Intonaco RAM gate means the total process-family working set
+   did not remain below 100 MiB; it does not mean there was a crash.
+   Dedicated GPU memory must still be checked separately.
+9. Pause **immediately after selecting a new wallpaper**, before any frame
+   has been drawn. The GPU engine should present one original-quality frame,
+   freeze it, then enter deep pause; never leave the desktop permanently
+   black. Resume and switch several times without UI stalls.
 
 ## Acceptance gates
 
