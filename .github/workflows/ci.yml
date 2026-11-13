@@ -97,6 +97,13 @@ jobs:
           --self-contained true -o artifacts/installer-app
           /p:PublishSingleFile=false /p:PublishReadyToRun=true
 
+      - name: Verify standalone installer includes native GPU DLL
+        shell: pwsh
+        run: |
+          if (-not (Test-Path artifacts/installer-app/Intonaco.Video.dll)) {
+            throw 'GPU native DLL is missing from the standalone installer payload.'
+          }
+
       - name: Build and smoke test Windows installer
         shell: pwsh
         run: |
