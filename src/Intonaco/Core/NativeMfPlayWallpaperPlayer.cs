@@ -380,27 +380,9 @@ namespace Intonaco.Core
                 // Always preserve color source and geometric pixel aspect.
                 // Fit = whole frame, Fill = crop rather than stretch or blur.
                 _player.SetAspectRatioMode(1); // MFVideoARMode_PreservePicture
-                VideoRect rect = VideoRect.Full;
-                if (_stretch != Stretch.Uniform &&
-                    NaturalVideoWidth > 0 && NaturalVideoHeight > 0 &&
-                    _host.ActualWidth > 0 && _host.ActualHeight > 0)
-                {
-                    double sourceAspect = (double)NaturalVideoWidth / NaturalVideoHeight;
-                    double destinationAspect = _host.ActualWidth / _host.ActualHeight;
-                    if (sourceAspect > destinationAspect)
-                    {
-                        float crop = (float)((1 - destinationAspect / sourceAspect) / 2);
-                        rect.Left = crop;
-                        rect.Right = 1 - crop;
-                    }
-                    else if (sourceAspect < destinationAspect)
-                    {
-                        float crop = (float)((1 - sourceAspect / destinationAspect) / 2);
-                        rect.Top = crop;
-                        rect.Bottom = 1 - crop;
-                    }
-                }
-
+                VideoRect rect = CalculateSourceCrop(_stretch,
+                    NaturalVideoWidth, NaturalVideoHeight,
+                    _host.ActualWidth, _host.ActualHeight);
                 _player.SetVideoSourceRect(ref rect);
                 _player.UpdateVideo();
             }
@@ -408,6 +390,38 @@ namespace Intonaco.Core
             {
                 DebugLog.Write("Native video placement unavailable: " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Aspect-correct normalized source crop. No CPU resampling, invented
+        /// pixels, stretching, contrast changes or color overrides.
+        /// </summary>
+        internal static VideoRect CalculateSourceCrop(
+            Stretch fit, double sourceWidth, double sourceHeight,
+            double targetWidth, double targetHeight)
+        {
+            VideoRect rect = VideoRect.Full;
+            if (fit == Stretch.Uniform ||
+                sourceWidth <= 0 || sourceHeight <= 0 ||
+                targetWidth <= 0 || targetHeight <= 0)
+                return rect;
+
+            double sourceAspect = sourceWidth / sourceHeight;
+            double targetAspect = targetWidth / targetHeight;
+            if (sourceAspect > targetAspect)
+            {
+                float crop = (float)((1 - targetAspect / sourceAspect) / 2);
+                rect.Left = crop;
+                rect.Right = 1 - crop;
+            }
+            else if (sourceAspect < targetAspect)
+            {
+                float crop = (float)((1 - sourceAspect / targetAspect) / 2);
+                rect.Top = crop;
+                rect.Bottom = 1 - crop;
+            }
+
+            return rect;
         }
 
         private void TryApplyAudio()
