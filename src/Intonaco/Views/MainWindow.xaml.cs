@@ -102,6 +102,7 @@ namespace Intonaco.Views
         public MainWindow()
         {
             _settings = AppSettings.Load();
+            MpvWallpaperPlayer.ConfiguredExecutablePath = _settings.MpvExecutablePath;
             if (_settings.PlaybackBackend == "MPV" &&
                 !MpvWallpaperPlayer.TryLocateExecutable(out _))
             {
@@ -131,6 +132,9 @@ namespace Intonaco.Views
             WireEvents();
             InitializeSystemTray();
             UpdateBackendInterface();
+            MpvPathStatusText.Text = MpvWallpaperPlayer.TryLocateExecutable(out _)
+                ? "MPV available — select it for calibrated video color."
+                : "Optional: locate mpv.exe to enable color-managed playback.";
 
             // A manual launch must always open the controls. Automatic startup
             // with --minimized initializes the WPF surface before hiding it;
@@ -1820,6 +1824,41 @@ namespace Intonaco.Views
             }
         }
 #endif
+
+        private void OnChooseMpvExecutable(object sender, RoutedEventArgs e)
+        {
+            var picker = new OpenFileDialog
+            {
+                Title = "Locate your installed mpv.exe",
+                Filter = "MPV player (mpv.exe)|mpv.exe|Executables (*.exe)|*.exe",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+
+            if (picker.ShowDialog(this) != true)
+                return;
+
+            if (!string.Equals(Path.GetFileName(picker.FileName), "mpv.exe",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                ShowError("Choose an installed MPV player named mpv.exe.");
+                return;
+            }
+
+            try
+            {
+                _settings.MpvExecutablePath = Path.GetFullPath(picker.FileName);
+                MpvWallpaperPlayer.ConfiguredExecutablePath =
+                    _settings.MpvExecutablePath;
+                _settings.Save();
+                MpvPathStatusText.Text = "MPV located. Select MPV under Video engine to use it.";
+                DebugLog.Write("Optional MPV executable configured by user.");
+            }
+            catch (Exception ex)
+            {
+                ShowError("Could not configure MPV: " + ex.Message);
+            }
+        }
 
         private void OnBackendChanged(object sender, SelectionChangedEventArgs e)
         {
