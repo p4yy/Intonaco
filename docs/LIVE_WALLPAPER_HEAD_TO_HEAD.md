@@ -38,6 +38,10 @@ webwallpaper32.exe, ui32.exe and ui64.exe. Helpers which outlive their
 launcher can become orphaned: **check the whole Task Manager process list**
 and make sure the benchmark includes a real mpv decoder if present.
 An unrelated mpv instance must not be added to either total.
+If a true video decoder or watchdog becomes orphaned, add it explicitly
+with -ExtraProcessIds 1111,2222 (using its currently verified process IDs
+from Task Manager). This prevents incorrectly treating a competitor's
+separate playback process as free memory.
 
 ## Repeat the paused test
 
