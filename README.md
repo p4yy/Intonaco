@@ -29,6 +29,14 @@
 
 <sub>Real application recording. [Play the demo with sound](https://cdn.jsdelivr.net/gh/p4yy/Intonaco@v2.2.0/docs/demo/intonaco-demo.mp4) · [View a still screenshot](docs/demo/intonaco-demo-poster.png)</sub>
 
+## Screenshots
+
+| Desktop playback | Wallpaper history |
+| :---: | :---: |
+| <img src="docs/media/intonaco-desktop-playback.jpg" width="560" alt="Real Intonaco Wallpaper window playing a blue video wallpaper on the Windows desktop" /> | <img src="docs/media/intonaco-wallpaper-library.jpg" width="560" alt="Real Intonaco Wallpaper window showing playback controls and a list of recent wallpapers" /> |
+
+<sub>Actual app captures, resized for the web. The sample wallpapers shown are user-selected media and are not bundled with Intonaco.</sub>
+
 ## Features
 
 - **Live desktop wallpaper:** Play a supported local video behind Windows desktop icons.
