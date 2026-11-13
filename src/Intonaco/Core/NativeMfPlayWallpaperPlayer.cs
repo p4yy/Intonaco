@@ -137,9 +137,14 @@ namespace Intonaco.Core
 
         public bool Play(string path)
         {
-            if (_disposed || !MediaFormatProbe.TryValidate(path, out string reason))
+            if (_disposed)
             {
-                ErrorOccurred?.Invoke(_disposed ? "Native video player has been disposed." : reason);
+                ErrorOccurred?.Invoke("Native video player has been disposed.");
+                return false;
+            }
+            if (!MediaFormatProbe.TryValidate(path, out string reason))
+            {
+                ErrorOccurred?.Invoke(reason);
                 return false;
             }
 
