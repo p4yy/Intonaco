@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Media;
@@ -75,6 +77,8 @@ namespace Intonaco.Core
         private long _frames;
         private bool _errorRaised;
         private bool _lastDecoderSleeping;
+        private long _telemetryStartTicks;
+        private long _telemetryStartFrames;
         private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
 
         public GpuVideoWallpaperPlayer()
@@ -172,11 +176,15 @@ namespace Intonaco.Core
                 _mediaOpened = false;
                 _errorRaised = false;
                 _frames = 0;
+                _telemetryStartTicks = 0;
+                _telemetryStartFrames = 0;
+                _poll.Interval = TimeSpan.FromMilliseconds(300);
                 Configure();
                 _poll.Start();
                 SetState(WallpaperPlayer.PlaybackState.Playing);
                 DebugLog.Write("Intonaco GPU engine started: DXGI frame server with " +
-                    "hardware decoder, two-buffer D3D11 compositor, no external player.");
+                    "D3D11 GPU presentation, two-buffer compositor, no external player. " +
+                    "Hardware video-decode support remains driver-dependent.");
                 return true;
             }
             catch (DllNotFoundException)
@@ -235,6 +243,8 @@ namespace Intonaco.Core
                 if (decoderSleeping != _lastDecoderSleeping)
                 {
                     _lastDecoderSleeping = decoderSleeping;
+                    _poll.Interval = TimeSpan.FromMilliseconds(
+                        decoderSleeping ? 1500 : 300);
                     DebugLog.Write(decoderSleeping
                         ? "GPU deep pause active: decoder shut down, frozen DXGI frame retained."
                         : "GPU deep pause exited: video decoder restarted on resume.");
@@ -251,8 +261,8 @@ namespace Intonaco.Core
                     {
                         _mediaOpened = true;
                         DebugLog.Write(
-                            $"GPU video loaded: {s.Width}x{s.Height}, D3D11 hardware={s.GpuDecode != 0}, " +
-                            $"frame count={s.FramesPresented}; native frame server and limited surface queue.");
+                            $"GPU video loaded: {s.Width}x{s.Height}, D3D11 GPU device active={s.GpuDecode != 0}, " +
+                            $"frame count={s.FramesPresented}; actual hardware decoder selection is driver-dependent.");
                         MediaOpened?.Invoke(Duration);
                     }
                 }
@@ -263,6 +273,7 @@ namespace Intonaco.Core
                 if (_frames != s.FramesPresented)
                     _frames = s.FramesPresented;
 
+                LogGpuFrameTelemetry(s, decoderSleeping);
                 RuntimeMemoryDiagnostics.LogIfDue(
                     "GPU-DirectX", false, s.Width, s.Height);
             }
@@ -277,6 +288,64 @@ namespace Intonaco.Core
             catch (SEHException ex)
             {
                 ReportError("Native video graphics driver error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Real presented-frame throughput and process RAM, sampled at 15s
+        /// intervals. This reports what reached DXGI (not source bitrate,
+        /// decoded-frame estimates, GPU percent, or a fabricated FPS cap).
+        /// </summary>
+        private void LogGpuFrameTelemetry(Stats stats, bool decoderSleeping)
+        {
+            long now = Stopwatch.GetTimestamp();
+            if (_telemetryStartTicks == 0)
+            {
+                _telemetryStartTicks = now;
+                _telemetryStartFrames = stats.FramesPresented;
+                return;
+            }
+
+            double seconds = (now - _telemetryStartTicks) /
+                             (double)Stopwatch.Frequency;
+            if (seconds < 15)
+                return;
+
+            long presentedDelta = Math.Max(0,
+                stats.FramesPresented - _telemetryStartFrames);
+            double presentedFps = presentedDelta / seconds;
+            _telemetryStartTicks = now;
+            _telemetryStartFrames = stats.FramesPresented;
+
+            try
+            {
+                using Process process = Process.GetCurrentProcess();
+                process.Refresh();
+                if (!decoderSleeping && !_pauseRequested &&
+                    presentedDelta == 0)
+                {
+                    DebugLog.Write("GPU warning: no new frame presented for 15 seconds " +
+                        "while playback is requested. Check the Windows video decoder.");
+                }
+                DebugLog.Write("GPU playback sample: " +
+                    "phase=" + (decoderSleeping ? "deep-paused" :
+                        _pauseRequested ? "paused" : "playing") +
+                    " framePresentationFps=" +
+                        presentedFps.ToString("F1", CultureInfo.InvariantCulture) +
+                    " framesTotal=" + stats.FramesPresented +
+                    " workingSetMiB=" +
+                        (process.WorkingSet64 / 1048576.0)
+                            .ToString("F1", CultureInfo.InvariantCulture) +
+                    " privateMiB=" +
+                        (process.PrivateMemorySize64 / 1048576.0)
+                            .ToString("F1", CultureInfo.InvariantCulture) +
+                    " decoderReleased=" + decoderSleeping +
+                    " source=" + stats.Width + "x" + stats.Height);
+            }
+            catch (Exception ex) when (
+                ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                DebugLog.Write("GPU frame sample unavailable: " + ex.Message);
             }
         }
 
@@ -316,6 +385,7 @@ namespace Intonaco.Core
             if (CurrentState != WallpaperPlayer.PlaybackState.Paused)
                 return;
             _pauseRequested = false;
+            _poll.Interval = TimeSpan.FromMilliseconds(300);
             Configure();
             SetState(WallpaperPlayer.PlaybackState.Playing);
         }
@@ -351,6 +421,9 @@ namespace Intonaco.Core
             _mediaOpened = false;
             _errorRaised = false;
             _lastDecoderSleeping = false;
+            _telemetryStartTicks = 0;
+            _telemetryStartFrames = 0;
+            _poll.Interval = TimeSpan.FromMilliseconds(300);
             _pauseRequested = false;
             _position = TimeSpan.Zero;
             NaturalVideoWidth = NaturalVideoHeight = 0;

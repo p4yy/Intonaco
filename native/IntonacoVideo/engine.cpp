@@ -328,6 +328,13 @@ namespace
                     bool metadataReady = false;
                     auto nextMetadataQuery = std::chrono::steady_clock::now();
                     auto nextPositionQuery = std::chrono::steady_clock::now();
+                    // Derive polling from actual media presentation timestamps,
+                    // not the app's preferred FPS. This reduces wakeups for
+                    // 24 FPS wallpapers and improves sampling of 60 FPS clips
+                    // without altering their decoded frames or colors.
+                    LONGLONG lastPresentationTime = -1;
+                    double sourceFrameIntervalMs = 0.0;
+                    int activePollMs = 16;
 
                     while (!s->stop.load(std::memory_order_acquire))
                     {
@@ -369,6 +376,9 @@ namespace
                             metadataReady = false;
                             nextMetadataQuery = std::chrono::steady_clock::now();
                             nextPositionQuery = nextMetadataQuery;
+                            lastPresentationTime = -1;
+                            sourceFrameIntervalMs = 0.0;
+                            activePollMs = 16;
                             begun = false;
                             lastPause = false;
                             lastMute = !wantedMute;
@@ -497,8 +507,11 @@ namespace
                             continue;
                         }
 
+                        // Preserve the last full-quality GPU frame while
+                        // paused. Resizing DXGI buffers during deep pause
+                        // would discard it and show a black wallpaper.
                         RECT nowRect{};
-                        if (GetClientRect(hwnd, &nowRect))
+                        if (!wantedPause && GetClientRect(hwnd, &nowRect))
                         {
                             UINT w = static_cast<UINT>(
                                 std::max<LONG>(2, nowRect.right - nowRect.left));
@@ -524,13 +537,32 @@ namespace
 
                         // No CompositionTarget.Rendering, WPF bitmaps or
                         // expensive CPU readback. Present only decoded frames.
-                        if (begun && s->loaded.load() &&
-                            (s->phase.load() != 3 || !wantedPause))
+                        if (begun && s->loaded.load() && !wantedPause)
                         {
                             LONGLONG presentationTime = 0;
                             HRESULT tick = player->OnVideoStreamTick(&presentationTime);
                             if (tick == S_OK)
                             {
+                                if (lastPresentationTime >= 0 &&
+                                    presentationTime > lastPresentationTime)
+                                {
+                                    const double ms = static_cast<double>(
+                                        presentationTime - lastPresentationTime) / 10000.0;
+                                    // Ignore unusual seeks and tiny/huge PTS
+                                    // deltas rather than letting them disturb
+                                    // steady-state frame pacing.
+                                    if (ms >= 10.0 && ms <= 100.0)
+                                    {
+                                        sourceFrameIntervalMs =
+                                            sourceFrameIntervalMs <= 0.0 ? ms :
+                                            sourceFrameIntervalMs * 0.75 + ms * 0.25;
+                                        activePollMs = std::clamp(
+                                            static_cast<int>(std::lround(
+                                                sourceFrameIntervalMs * 0.5)),
+                                            8, 20);
+                                    }
+                                }
+                                lastPresentationTime = presentationTime;
                                 ComPtr<ID3D11Texture2D> surface;
                                 hr = swap->GetBuffer(0, IID_PPV_ARGS(&surface));
                                 if (SUCCEEDED(hr))
@@ -620,11 +652,12 @@ namespace
                             s->phase.store(1);
                         }
 
-                        // 16 ms polling avoids doing five empty checks
-                        // between frames of a 24 FPS wallpaper. Paused mode
-                        // uses a slow clock and never renders a new frame.
+                        // For 24 FPS clips sample near 20 ms, 30 FPS near
+                        // 16 ms, and 60 FPS near 8 ms. Do not spin or change
+                        // the media presentation clock. Pause is slower still.
                         std::this_thread::sleep_for(
-                            std::chrono::milliseconds(wantedPause ? 120 : 16));
+                            std::chrono::milliseconds(
+                                wantedPause ? 120 : activePollMs));
                     }
 
                     if (player)
