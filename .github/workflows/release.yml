@@ -37,6 +37,10 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=Intonaco-Wallpaper" >> $env:GITHUB_OUTPUT
 
+      - name: Build Intonaco native GPU renderer (x64, no external app)
+        shell: pwsh
+        run: ./tools/Build-NativeVideo.ps1
+
       - name: Restore
         run: dotnet restore Intonaco.sln
 
