@@ -194,10 +194,12 @@ namespace Intonaco.Views
         private void UpdateBackendInterface()
         {
             bool mpv = _player is MpvWallpaperPlayer;
-            FpsComboBox.IsEnabled = !mpv;
-            FpsComboBox.ToolTip = mpv
-                ? "MPV uses the source's native frame cadence; the Windows FPS cap does not apply."
-                : "Preferred presentation frame rate.";
+            // WPF MediaElement and MPV currently follow the source video
+            // frame rate. Timeline.DesiredFrameRate is an animation property,
+            // not a MediaElement frame limit. Never advertise a fake FPS cap.
+            FpsComboBox.IsEnabled = false;
+            FpsComboBox.ToolTip =
+                "Video plays at its original frame rate. Changing an FPS limit is unavailable in this renderer.";
             PreviewHintText.Text = mpv
                 ? "MPV shows the wallpaper on the desktop without a second decoder."
                 : "Drop a video here or choose a file";
@@ -1875,34 +1877,20 @@ namespace Intonaco.Views
             {
                 _settings.TargetFps = fps;
                 _player.TargetFps = fps;
-                ApplyPreviewFrameRateCap(fps);
                 _settings.Save();
                 DebugLog.Write(
-                    $"Frame rate changed to {fps} fps; desktop cap " +
-                    $"{(fps >= 60 ? "cleared" : fps + " fps")} and preview cap re-applied.");
+                    $"FPS preference saved as {fps}; native decoder follows the source cadence (no artificial FPS cap).");
             }
         }
 
         /// <summary>
-        /// Mirrors the desktop player's frame-rate cap onto the in-app preview
-        /// so the two never present at different rates. 60 fps clears the cap.
+        /// WPF MediaElement does not expose a safe frame-rate limiter. This
+        /// compatibility method is intentionally a no-op: applying the
+        /// Timeline attached property throws an InvalidCastException.
         /// </summary>
         private void ApplyPreviewFrameRateCap(int fps)
         {
-            try
-            {
-                if (fps >= 60)
-                    PreviewMedia.ClearValue(
-                        System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty);
-                else
-                    PreviewMedia.SetValue(
-                        System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty,
-                        Math.Clamp(fps, 1, 60));
-            }
-            catch (Exception ex)
-            {
-                DebugLog.Write($"Preview frame-rate cap failed: {ex.Message}");
-            }
+            // Source cadence remains unchanged; no hidden re-encoding.
         }
 
         private void OnFitChanged(object sender, SelectionChangedEventArgs e)
