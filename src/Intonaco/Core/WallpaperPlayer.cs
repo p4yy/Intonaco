@@ -58,10 +58,9 @@ namespace Intonaco.Core
         private double _playbackSpeed = 1.0;
         private bool _loopPlayback = true;
 
-        // Do not subscribe to CompositionTarget.Rendering for FPS statistics:
-        // that callback can keep WPF compositing even with the UI hidden.
-        // DesiredFrameRate is a hint; the native decoder determines the actual
-        // presentation cadence. Profile real CPU/GPU on device instead.
+        // No CompositionTarget.Rendering sampler: it wakes WPF every frame.
+        // MediaElement uses its own native video clock; attaching WPF's
+        // Timeline.DesiredFrameRate throws and does not cap decoder FPS.
 
         public event Action<string>? ErrorOccurred;
         public event Action<PlaybackState>? StateChanged;
@@ -113,9 +112,8 @@ namespace Intonaco.Core
             {
                 _targetFps = Math.Clamp(value, 1, 60);
 
-                // A live frame-rate change must reach the media clock
-                // immediately, not only on the next ApplyMediaSettings.
-                ApplyFrameRateCap();
+                // MediaElement cannot be capped using WPF animation timelines.
+                // Preserve the user's saved preference only for compatibility.
             }
         }
 
@@ -293,10 +291,6 @@ namespace Intonaco.Core
             };
             _host.Children.Add(mediaElement);
             _host.Children.Add(_pausedImage);
-
-            // The host root carries the frame-rate cap too, so the value is
-            // still in scope if the MediaElement is re-created on resume.
-            ApplyFrameRateCap();
 
             return _host;
         }
@@ -1118,39 +1112,8 @@ namespace Intonaco.Core
             _mediaElement.IsMuted = _isMuted;
             _mediaElement.Volume = _volume;
 
-            ApplyFrameRateCap();
-        }
-
-        /// <summary>
-        /// Caps the media timeline's presentation rate. 60 fps clears the cap
-        /// (WPF default), any lower value sets Timeline.DesiredFrameRate, which
-        /// is the frame-interval hint the WPF media clock honours: 30 fps means
-        /// a ~33.3 ms interval instead of ~16.6 ms, halving the number of
-        /// video frames composited onto the desktop.
-        ///
-        /// The value is written as a local value on the MediaElement only. The
-        /// property is an inheriting attached property, so writing it on the
-        /// host root as well leaves a stale inherited value behind after a
-        /// ClearValue and can re-cap a later 60 fps session.
-        /// </summary>
-        private void ApplyFrameRateCap()
-        {
-            if (_mediaElement == null)
-                return;
-
-            int fps = Math.Clamp(_targetFps, 1, 60);
-
-            try
-            {
-                if (fps >= 60)
-                    _mediaElement.ClearValue(Timeline.DesiredFrameRateProperty);
-                else
-                    _mediaElement.SetValue(Timeline.DesiredFrameRateProperty, fps);
-            }
-            catch (Exception ex)
-            {
-                DebugLog.Write($"Frame-rate cap could not be applied: {ex.Message}");
-            }
+            // Media Foundation (not WPF Timeline) owns the native video clock.
+            // An FPS cap needs a separate decoder/presentation implementation.
         }
 
         /// <summary>
