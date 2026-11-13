@@ -1,12 +1,10 @@
 // Intonaco Video — original GPU-first Windows wallpaper renderer.
 // Licensed under the Intonaco repository license. No Lively/mpv/VLC code.
 // Uses Windows Media Foundation + D3D11 GPU surfaces without CPU frame copies.
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <windows.h>
 #include <d3d11.h>
 #include <d3d10.h>
-#include <dxgi1_2.h>
+#include <dxgi1_3.h>
 #include <mfapi.h>
 #include <mferror.h>
 #include <mfidl.h>
