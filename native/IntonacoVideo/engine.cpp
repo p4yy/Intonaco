@@ -29,7 +29,7 @@ namespace
     // Stable across the C ABI; C# declares this exact layout.
     struct VideoStats
     {
-        int phase;       // 0=start, 1=ready, 2=playing, 3=paused, -1=error
+        int phase;       // 0=start, 1=ready, 2=playing, 3=paused, 4=waiting for old decoder, -1=error
         int errorHr;
         int gpuDecode;   // 1=real D3D11 hardware device + DXGI manager
         int width;
@@ -206,6 +206,7 @@ namespace
             // after Intonaco's UI has moved on to the new wallpaper. Wait on
             // this background thread (never WPF UI) until its resources have
             // actually gone away. Cancellation stays responsive.
+            s->phase.store(4);
             const auto deadline =
                 std::chrono::steady_clock::now() + std::chrono::seconds(10);
             while (!ActiveDecoderLease.try_lock_for(
@@ -225,6 +226,7 @@ namespace
                 ActiveDecoderLease, std::adopt_lock);
             if (s->stop.load(std::memory_order_acquire))
                 return;
+            s->phase.store(0);
 
             const HRESULT co = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
             const bool uninitializeCo = SUCCEEDED(co);
