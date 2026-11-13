@@ -172,7 +172,7 @@ namespace Intonaco.Tests
             }
         }
 
-        private static string CreateSampleVideo()
+        internal static string CreateSampleVideo()
         {
             const int width = 320;
             const int height = 180;
