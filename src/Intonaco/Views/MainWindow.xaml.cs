@@ -102,14 +102,9 @@ namespace Intonaco.Views
         public MainWindow()
         {
             _settings = AppSettings.Load();
-            MpvWallpaperPlayer.ConfiguredExecutablePath = _settings.MpvExecutablePath;
-            if (_settings.PlaybackBackend == "MPV" &&
-                !MpvWallpaperPlayer.TryLocateExecutable(out _))
-            {
-                DebugLog.Write("Saved MPV backend unavailable; using the built-in native player.");
-                _settings.PlaybackBackend = "Native";
-                _settings.Save();
-            }
+            // The bundled GPU engine is the default. Existing explicit
+            // Windows/Native compatibility selections remain respected.
+            // Old MPV preferences are normalized to GPU by AppSettings.
             _player = CreatePlayer(_settings.PlaybackBackend);
             _desktop = new DesktopIntegration();
             _fullscreenDetector = new FullscreenDetector();
@@ -132,9 +127,6 @@ namespace Intonaco.Views
             WireEvents();
             InitializeSystemTray();
             UpdateBackendInterface();
-            MpvPathStatusText.Text = MpvWallpaperPlayer.TryLocateExecutable(out _)
-                ? "MPV available — select it for calibrated video color."
-                : "Optional: locate mpv.exe to enable color-managed playback.";
 
             // A manual launch must always open the controls. Automatic startup
             // with --minimized initializes the WPF surface before hiding it;
@@ -171,7 +163,6 @@ namespace Intonaco.Views
             AppSettings.NormalizeBackend(backend) switch
             {
                 "GPU" => new GpuVideoWallpaperPlayer(),
-                "MPV" => new MpvWallpaperPlayer(),
                 "Windows" => new WallpaperPlayer(),
                 _ => new NativeMfPlayWallpaperPlayer()
             };
@@ -202,21 +193,15 @@ namespace Intonaco.Views
 
         private void UpdateBackendInterface()
         {
-            bool mpv = _player is MpvWallpaperPlayer;
-            // Each backend follows the native video's source cadence.
-            // WPF MediaElement and MPV currently follow the source video
-            // frame rate. Timeline.DesiredFrameRate is an animation property,
-            // not a MediaElement frame limit. Never advertise a fake FPS cap.
+            // Playback follows the original source frame rate.
+            // WPF MediaElement has no reliable DesiredFrameRate control;
+            // the old preset dropdown is hidden rather than implying a cap.
             FpsComboBox.IsEnabled = false;
-            FpsComboBox.ToolTip =
-                "Video plays at its original frame rate. Changing an FPS limit is unavailable in this renderer.";
             PreviewHintText.Text = _player is GpuVideoWallpaperPlayer
-                ? "Intonaco GPU — hardware decoding and direct DXGI presentation."
+                ? "Original video quality, rendered directly on your desktop."
                 : _player is NativeMfPlayWallpaperPlayer
-                    ? "Built-in native playback — no external player or extra preview decoder."
-                : mpv
-                    ? "Optional MPV renders without a second in-app decoder."
-                    : "Drop a video here or choose a file";
+                    ? "Built-in Windows video compatibility playback."
+                    : "Choose a video to make your desktop move.";
         }
 
         private void LoadSettings()
@@ -1861,41 +1846,6 @@ namespace Intonaco.Views
         }
 #endif
 
-        private void OnChooseMpvExecutable(object sender, RoutedEventArgs e)
-        {
-            var picker = new OpenFileDialog
-            {
-                Title = "Locate your installed mpv.exe",
-                Filter = "MPV player (mpv.exe)|mpv.exe|Executables (*.exe)|*.exe",
-                CheckFileExists = true,
-                Multiselect = false
-            };
-
-            if (picker.ShowDialog(this) != true)
-                return;
-
-            if (!string.Equals(Path.GetFileName(picker.FileName), "mpv.exe",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                ShowError("Choose an installed MPV player named mpv.exe.");
-                return;
-            }
-
-            try
-            {
-                _settings.MpvExecutablePath = Path.GetFullPath(picker.FileName);
-                MpvWallpaperPlayer.ConfiguredExecutablePath =
-                    _settings.MpvExecutablePath;
-                _settings.Save();
-                MpvPathStatusText.Text = "MPV located. Select MPV under Video engine to use it.";
-                DebugLog.Write("Optional MPV executable configured by user.");
-            }
-            catch (Exception ex)
-            {
-                ShowError("Could not configure MPV: " + ex.Message);
-            }
-        }
-
         private void OnBackendChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents ||
@@ -1907,23 +1857,12 @@ namespace Intonaco.Views
             if (requested == _settings.PlaybackBackend)
                 return;
 
-            if (requested == "MPV" &&
-                !MpvWallpaperPlayer.TryLocateExecutable(out _))
-            {
-                _suppressEvents = true;
-                try { SelectComboByTag(BackendComboBox, _settings.PlaybackBackend); }
-                finally { _suppressEvents = false; }
-                ShowError("MPV is optional and not bundled. Install mpv from mpv.io, " +
-                    "put mpv.exe beside Intonaco.exe or add it to PATH, then choose MPV again.");
-                return;
-            }
-
             string? activeFile = _activeOriginalFile;
             bool wasPaused = _player.CurrentState == WallpaperPlayer.PlaybackState.Paused;
             TimeSpan position = _player.Position;
 
-            // Release one backend fully before activating the next. Never
-            // retain two desktop decoders or orphaned MPV processes.
+            // Release the current decoder before enabling the next engine.
+            // Every selectable engine is already bundled with Windows/Intonaco.
             ++_wallpaperRequestVersion;
             _preparationCancellation?.Cancel();
             StopWallpaper();
@@ -2194,20 +2133,11 @@ namespace Intonaco.Views
         {
             if (_isExiting) return;
 
-            string detail;
-            if (_player is MpvWallpaperPlayer)
-            {
-                detail = "MPV could not play this video. Verify your optional MPV " +
-                    "installation and its supported codecs. Details: " + message;
-            }
-            else
-            {
-                detail = NativeMediaEngine.IsLikelyDecoderFailure(message)
-                    ? NativeMediaEngine.CodecHelp +
-                        " You can also select the optional MPV backend in Playback settings. " +
-                        "Details: " + message
-                    : message;
-            }
+            string detail = NativeMediaEngine.IsLikelyDecoderFailure(message)
+                ? NativeMediaEngine.CodecHelp +
+                  " Try the Windows compatibility engine in Playback settings. " +
+                  "Details: " + message
+                : message;
 
             NotifyPlaybackError(detail);
             // If this video cannot be decoded, restore the previous source
