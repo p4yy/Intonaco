@@ -85,6 +85,8 @@ namespace Intonaco.Core
                 : PauseWhenUnfocusedMode;
 
         internal static string NormalizeBackend(string? backend) =>
+            string.Equals(backend, "GPU", StringComparison.OrdinalIgnoreCase)
+                ? "GPU" :
             string.Equals(backend, "MPV", StringComparison.OrdinalIgnoreCase)
                 ? "MPV" :
             string.Equals(backend, "Windows", StringComparison.OrdinalIgnoreCase)
