@@ -589,7 +589,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                 <TextBlock Text="Video engine" Style="{StaticResource SettingTitleText}" />
-                                <TextBlock Text="Windows is built in; MPV is optional"
+                                <TextBlock Text="Native Windows video is built in; no extra installation"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
                             <ComboBox x:Name="BackendComboBox"
@@ -598,7 +598,8 @@
                                       Width="155" VerticalAlignment="Center"
                                       AutomationProperties.Name="Video playback engine"
                                       SelectionChanged="OnBackendChanged">
-                                <ComboBoxItem Content="Windows" Tag="Windows" IsSelected="True" />
+                                <ComboBoxItem Content="Native (built in)" Tag="Native" IsSelected="True" />
+                                <ComboBoxItem Content="Windows (fallback)" Tag="Windows" />
                                 <ComboBoxItem Content="MPV (optional)" Tag="MPV" />
                             </ComboBox>
                         </Grid>
