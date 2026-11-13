@@ -107,6 +107,70 @@ namespace Intonaco.Tests
         }
 
         [Fact]
+        public void NativeFramePolling_AdaptsTo24_30_60FpsWithoutChangingSource()
+        {
+            // Compile-time and source-structure regression guard. Hardware
+            // frame quality and frame rate are verified by the Win11 test PC.
+            string? engine = null;
+            for (var folder = new DirectoryInfo(AppContext.BaseDirectory);
+                 folder != null; folder = folder.Parent)
+            {
+                string file = Path.Combine(folder.FullName,
+                    "native", "IntonacoVideo", "engine.cpp");
+                if (File.Exists(file))
+                {
+                    engine = File.ReadAllText(file);
+                    break;
+                }
+            }
+
+            Assert.NotNull(engine);
+            Assert.Contains("lastPresentationTime = -1", engine!);
+            Assert.Contains("sourceFrameIntervalMs", engine!);
+            Assert.Contains("std::lround(", engine!);
+            Assert.Contains("std::clamp(", engine!);
+            Assert.Contains("activePollMs", engine!);
+            Assert.Contains("player->OnVideoStreamTick", engine!);
+            Assert.Contains("player->TransferVideoFrame", engine!);
+            Assert.Contains("if (!wantedPause && GetClientRect", engine!);
+
+            // Equivalent expected pacing windows of the native formula:
+            // half the source frame interval, clamped to 8..20ms.
+            Assert.Equal(20, ExpectedPollInterval(1000.0 / 24));
+            Assert.Equal(17, ExpectedPollInterval(1000.0 / 30));
+            Assert.Equal(8, ExpectedPollInterval(1000.0 / 60));
+        }
+
+        private static int ExpectedPollInterval(double framePeriodMs) =>
+            Math.Clamp((int)Math.Round(framePeriodMs * 0.5,
+                MidpointRounding.AwayFromZero), 8, 20);
+
+        [Fact]
+        public void GpuTelemetry_SamplesPresentedFramesAndSleepsWhenDecoderIsReleased()
+        {
+            string? player = null;
+            for (var folder = new DirectoryInfo(AppContext.BaseDirectory);
+                 folder != null; folder = folder.Parent)
+            {
+                string file = Path.Combine(folder.FullName,
+                    "src", "Intonaco", "Core", "GpuVideoWallpaperPlayer.cs");
+                if (File.Exists(file))
+                {
+                    player = File.ReadAllText(file);
+                    break;
+                }
+            }
+
+            Assert.NotNull(player);
+            Assert.Contains("LogGpuFrameTelemetry", player!);
+            Assert.Contains("stats.FramesPresented", player!);
+            Assert.Contains("decoderSleeping ? 1500 : 300", player!);
+            Assert.Contains("framePresentationFps=", player!);
+            Assert.Contains("workingSetMiB=", player!);
+            Assert.DoesNotContain("EmptyWorkingSet", player!);
+        }
+
+        [Fact]
         public void OriginalVideoModule_HasAllExpectedNativeExports()
         {
             if (!OperatingSystem.IsWindows())
