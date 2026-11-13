@@ -35,7 +35,7 @@ namespace Intonaco.Tests
             Assert.Equal("GPU", AppSettings.NormalizeBackend("gpu"));
             Assert.Equal("Native", AppSettings.NormalizeBackend("Native"));
             Assert.Equal("Windows", AppSettings.NormalizeBackend("Windows"));
-            Assert.Equal("MPV", AppSettings.NormalizeBackend("MPV"));
+            Assert.Equal("GPU", AppSettings.NormalizeBackend("MPV"));
         }
 
         [Fact]
