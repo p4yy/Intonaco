@@ -602,6 +602,19 @@
                                 <ComboBoxItem Content="MPV (optional)" Tag="MPV" />
                             </ComboBox>
                         </Grid>
+                        <Grid Margin="16,0,16,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="Locate MPV..."
+                                    Style="{StaticResource GhostButton}"
+                                    Height="32" Click="OnChooseMpvExecutable" />
+                            <TextBlock x:Name="MpvPathStatusText" Grid.Column="1"
+                                       TextWrapping="Wrap" VerticalAlignment="Center"
+                                       Margin="12,0,0,0"
+                                       Style="{StaticResource SettingDescriptionText}" />
+                        </Grid>
                         <Border Height="1" Margin="16,0" Background="{DynamicResource DividerBrush}" />
                         <Grid Margin="16,12">
                             <Grid.ColumnDefinitions>
