@@ -5,6 +5,7 @@
 #include <d3d11.h>
 #include <d3d10.h>
 #include <dxgi1_3.h>
+#include <dxgi1_4.h>
 #include <mfapi.h>
 #include <mferror.h>
 #include <mfidl.h>
@@ -36,11 +37,17 @@ namespace
         double duration;
         double position;
         long long frames;
+        // Per-process DXGI GPU residency; distinct from Task Manager RAM.
+        long long gpuLocalBytes;
+        long long gpuNonLocalBytes;
+        long long gpuLocalBudgetBytes;
+        long long gpuNonLocalBudgetBytes;
     };
 
     // C++ and .NET must agree on this fixed native telemetry layout.
-    static_assert(sizeof(VideoStats) == 48);
+    static_assert(sizeof(VideoStats) == 80);
     static_assert(offsetof(VideoStats, duration) == 24);
+    static_assert(offsetof(VideoStats, gpuLocalBytes) == 48);
 
     struct SharedState
     {
@@ -63,6 +70,10 @@ namespace
         std::atomic<int> width{0}, height{0};
         std::atomic<double> volume{0}, speed{1}, duration{0}, position{0}, seekTo{0};
         std::atomic<long long> frames{0};
+        std::atomic<long long> gpuLocalBytes{0};
+        std::atomic<long long> gpuNonLocalBytes{0};
+        std::atomic<long long> gpuLocalBudgetBytes{0};
+        std::atomic<long long> gpuNonLocalBudgetBytes{0};
     };
 
     // Owns a ref-counted, shared state. No native media calls are made from
@@ -208,6 +219,21 @@ namespace
                     // previous 800 MB CPU/video-memory problem.
                     if (FAILED(hr)) { fail(hr); goto done; }
 
+                    // Supported GPU residency + idle reclamation APIs.
+                    // No artificial process working-set trimming.
+                    ComPtr<IDXGIDevice3> idleDxgiDevice;
+                    (void)device.As(&idleDxgiDevice);
+                    ComPtr<IDXGIAdapter3> budgetAdapter;
+                    {
+                        ComPtr<IDXGIDevice> dxgiDevice;
+                        if (SUCCEEDED(device.As(&dxgiDevice)))
+                        {
+                            ComPtr<IDXGIAdapter> adapter;
+                            if (SUCCEEDED(dxgiDevice->GetAdapter(&adapter)))
+                                (void)adapter.As(&budgetAdapter);
+                        }
+                    }
+
                     UINT token = 0;
                     ComPtr<IMFDXGIDeviceManager> dxgiManager;
                     hr = MFCreateDXGIDeviceManager(&token, &dxgiManager);
@@ -328,6 +354,28 @@ namespace
                     bool metadataReady = false;
                     auto nextMetadataQuery = std::chrono::steady_clock::now();
                     auto nextPositionQuery = std::chrono::steady_clock::now();
+                    auto nextGpuMemoryQuery = std::chrono::steady_clock::now();
+                    const auto sampleGpuMemory = [&]()
+                    {
+                        if (!budgetAdapter) return;
+                        DXGI_QUERY_VIDEO_MEMORY_INFO info{};
+                        if (SUCCEEDED(budgetAdapter->QueryVideoMemoryInfo(
+                                0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info)))
+                        {
+                            s->gpuLocalBytes.store(
+                                static_cast<long long>(info.CurrentUsage));
+                            s->gpuLocalBudgetBytes.store(
+                                static_cast<long long>(info.Budget));
+                        }
+                        if (SUCCEEDED(budgetAdapter->QueryVideoMemoryInfo(
+                                0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &info)))
+                        {
+                            s->gpuNonLocalBytes.store(
+                                static_cast<long long>(info.CurrentUsage));
+                            s->gpuNonLocalBudgetBytes.store(
+                                static_cast<long long>(info.Budget));
+                        }
+                    };
                     // Derive polling from actual media presentation timestamps,
                     // not the app's preferred FPS. This reduces wakeups for
                     // 24 FPS wallpapers and improves sampling of 60 FPS clips
@@ -346,6 +394,15 @@ namespace
                         const bool wantedFill = s->fill.load();
                         const double wantedVolume = s->volume.load();
                         const double wantedSpeed = s->speed.load();
+
+                        // Query DXGI residency sparingly, not per 4K frame.
+                        if (std::chrono::steady_clock::now() >= nextGpuMemoryQuery)
+                        {
+                            nextGpuMemoryQuery =
+                                std::chrono::steady_clock::now() +
+                                std::chrono::seconds(5);
+                            sampleGpuMemory();
+                        }
 
                         // A paused video is a still image. DWM retains the
                         // last presented DXGI frame; after a short grace period
@@ -497,6 +554,19 @@ namespace
                             ++s->generation;
                             player->Shutdown();
                             player.Reset();
+
+                            // Only cached/temporary driver allocations are
+                            // eligible for reclamation. The last presented
+                            // full-color image stays owned by the swapchain.
+                            // Calling Trim while playing would risk stutter.
+                            context->ClearState();
+                            context->Flush();
+                            if (idleDxgiDevice)
+                                idleDxgiDevice->Trim();
+                            sampleGpuMemory();
+                            nextGpuMemoryQuery =
+                                std::chrono::steady_clock::now() +
+                                std::chrono::seconds(5);
                             s->decoderSleeping.store(1);
                             s->phase.store(3);
                             begun = false;
@@ -735,7 +805,9 @@ extern "C"
         const auto& s = *static_cast<Engine*>(handle)->state;
         *output = {s.phase.load(), s.error.load(), s.gpu.load(),
             s.width.load(), s.height.load(), s.decoderSleeping.load(),
-            s.duration.load(), s.position.load(), s.frames.load()};
+            s.duration.load(), s.position.load(), s.frames.load(),
+            s.gpuLocalBytes.load(), s.gpuNonLocalBytes.load(),
+            s.gpuLocalBudgetBytes.load(), s.gpuNonLocalBudgetBytes.load()};
         return S_OK;
     }
 
