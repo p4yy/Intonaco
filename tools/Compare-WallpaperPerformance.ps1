@@ -209,6 +209,16 @@ for ($i = 0; $i -lt $iterations; $i++) {
     $gpuSample = if ($IncludeGpuCounters) {
         Get-GpuSample -FamilyPids $current.ProcessIds
     } else { $null }
+    $videoDecodePercent = $null
+    $gpu3DPercent = $null
+    $gpuDedicatedMB = $null
+    $gpuSharedMB = $null
+    if ($gpuSample) {
+        $videoDecodePercent = $gpuSample.VideoDecode
+        $gpu3DPercent = $gpuSample.ThreeD
+        $gpuDedicatedMB = $gpuSample.DedicatedMiB
+        $gpuSharedMB = $gpuSample.SharedMiB
+    }
     $samples += [pscustomobject]@{
         App = $App
         Timestamp = $now.ToString('o')
@@ -221,10 +231,10 @@ for ($i = 0; $i -lt $iterations; $i++) {
         WorkingSetMB = $current.WorkingSetMB
         PrivateMemoryMB = $current.PrivateMemoryMB
         CpuPercent = [math]::Round($cpuPercent, 2)
-        VideoDecodePercent = if ($gpuSample) { $gpuSample.VideoDecode } else { $null }
-        Gpu3DPercent = if ($gpuSample) { $gpuSample.ThreeD } else { $null }
-        GpuDedicatedMB = if ($gpuSample) { $gpuSample.DedicatedMiB } else { $null }
-        GpuSharedMB = if ($gpuSample) { $gpuSample.SharedMiB } else { $null }
+        VideoDecodePercent = $videoDecodePercent
+        Gpu3DPercent = $gpu3DPercent
+        GpuDedicatedMB = $gpuDedicatedMB
+        GpuSharedMB = $gpuSharedMB
     }
     $previous = $current
     $lastTime = $now
