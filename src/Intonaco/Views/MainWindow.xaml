@@ -634,35 +634,25 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="Video engine" Style="{StaticResource SettingTitleText}" />
-                                <TextBlock Text="Intonaco GPU: direct D3D11 hardware video, no extra installation"
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE7F4;" Style="{StaticResource SettingGlyphText}" />
+                                    <TextBlock Text="Video engine" Style="{StaticResource SettingTitleText}" />
+                                </StackPanel>
+                                <TextBlock Text="Original 4K quality with hardware acceleration; compatibility engines available"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
                             <ComboBox x:Name="BackendComboBox"
                                       Grid.Column="1"
                                       Style="{StaticResource IntonacoComboBox}"
-                                      Width="155" VerticalAlignment="Center"
+                                      Width="186" VerticalAlignment="Center"
                                       AutomationProperties.Name="Video playback engine"
                                       SelectionChanged="OnBackendChanged">
-                                <ComboBoxItem Content="Intonaco GPU (test)" Tag="GPU" />
-                                <ComboBoxItem Content="Native (built in)" Tag="Native" IsSelected="True" />
-                                <ComboBoxItem Content="Windows (fallback)" Tag="Windows" />
-                                <ComboBoxItem Content="MPV (optional)" Tag="MPV" />
+                                <ComboBoxItem Content="Intonaco GPU" Tag="GPU" IsSelected="True" />
+                                <ComboBoxItem Content="Native compatibility" Tag="Native" />
+                                <ComboBoxItem Content="Windows compatibility" Tag="Windows" />
                             </ComboBox>
                         </Grid>
-                        <Grid Margin="16,0,16,12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="Locate MPV..."
-                                    Style="{StaticResource GhostButton}"
-                                    Height="32" Click="OnChooseMpvExecutable" />
-                            <TextBlock x:Name="MpvPathStatusText" Grid.Column="1"
-                                       TextWrapping="Wrap" VerticalAlignment="Center"
-                                       Margin="12,0,0,0"
-                                       Style="{StaticResource SettingDescriptionText}" />
-                        </Grid>
+
                         <Border Height="1" Margin="16,0" Background="{DynamicResource DividerBrush}" />
                         <Grid Margin="16,12">
                             <Grid.ColumnDefinitions>
@@ -671,7 +661,10 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="Fit" Style="{StaticResource SettingTitleText}" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE8A7;" Style="{StaticResource SettingGlyphText}" />
+                                    <TextBlock Text="Fit" Style="{StaticResource SettingTitleText}" />
+                                </StackPanel>
                                 <TextBlock Text="Choose how the video fits the screen"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
@@ -697,7 +690,10 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="Playback speed" Style="{StaticResource SettingTitleText}" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE916;" Style="{StaticResource SettingGlyphText}" />
+                                    <TextBlock Text="Playback speed" Style="{StaticResource SettingTitleText}" />
+                                </StackPanel>
                                 <TextBlock Text="Change the speed of the video"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
@@ -725,17 +721,23 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="Frame rate (source controlled)" Style="{StaticResource SettingTitleText}" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE916;" Style="{StaticResource SettingGlyphText}" />
+                                    <TextBlock Text="Frame rate (source controlled)" Style="{StaticResource SettingTitleText}" />
+                                </StackPanel>
                                 <TextBlock Text="Plays at the video's original frame rate"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
 
-                            <ComboBox x:Name="FpsComboBox"
-                                      Grid.Column="1"
-                                      Style="{StaticResource IntonacoComboBox}"
-                                      Width="120"
-                                      SelectionChanged="OnFpsChanged"
-                                      VerticalAlignment="Center">
+                            <TextBlock Grid.Column="1" Text="Original FPS"
+                                       Style="{StaticResource CaptionText}"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="The wallpaper plays at its original frame rate." />
+                            <!-- Hidden legacy control retained to read old FPS settings. -->
+                            <ComboBox x:Name="FpsComboBox" Grid.Column="1"
+                                      Visibility="Collapsed" IsHitTestVisible="False"
+                                      IsTabStop="False" SelectionChanged="OnFpsChanged">
                                 <ComboBoxItem Content="15 fps" Tag="15" />
                                 <ComboBoxItem Content="24 fps" Tag="24" />
                                 <ComboBoxItem Content="30 fps" Tag="30" IsSelected="True" />
@@ -751,7 +753,10 @@
                                   Checked="OnLoopChanged"
                                   Unchecked="OnLoopChanged">
                             <StackPanel>
-                                <TextBlock Text="Loop playback" Style="{StaticResource SettingTitleText}" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE895;" Style="{StaticResource SettingGlyphText}" />
+                                    <TextBlock Text="Loop playback" Style="{StaticResource SettingTitleText}" />
+                                </StackPanel>
                                 <TextBlock Text="Restart the video when it ends"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
@@ -770,8 +775,10 @@
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center"
                                         Margin="0,0,12,0">
-                                <TextBlock Text="When another app is active"
-                                           Style="{StaticResource SettingTitleText}" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE7F8;" Style="{StaticResource SettingGlyphText}" />
+                                    <TextBlock Text="When another app is active" Style="{StaticResource SettingTitleText}" />
+                                </StackPanel>
                                 <TextBlock Text="Pause to save resources, or keep the wallpaper moving."
                                            Style="{StaticResource SettingDescriptionText}"
                                            TextWrapping="Wrap" />
@@ -815,7 +822,10 @@
                                   Checked="OnStartupChanged"
                                   Unchecked="OnStartupChanged">
                             <StackPanel>
-                                <TextBlock Text="Start with Windows" Style="{StaticResource SettingTitleText}" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE8FB;" Style="{StaticResource SettingGlyphText}" />
+                                    <TextBlock Text="Start with Windows" Style="{StaticResource SettingTitleText}" />
+                                </StackPanel>
                                 <TextBlock Text="Launch Intonaco Wallpaper when you sign in"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
@@ -829,7 +839,10 @@
                                   Checked="OnStartMinimizedChanged"
                                   Unchecked="OnStartMinimizedChanged">
                             <StackPanel>
-                                <TextBlock Text="Start minimized" Style="{StaticResource SettingTitleText}" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE7F4;" Style="{StaticResource SettingGlyphText}" />
+                                    <TextBlock Text="Start minimized" Style="{StaticResource SettingTitleText}" />
+                                </StackPanel>
                                 <TextBlock Text="Launch in the tray when Windows starts"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
@@ -843,7 +856,10 @@
                                   Checked="OnAutoPlayChanged"
                                   Unchecked="OnAutoPlayChanged">
                             <StackPanel>
-                                <TextBlock Text="Resume last wallpaper" Style="{StaticResource SettingTitleText}" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE714;" Style="{StaticResource SettingGlyphText}" />
+                                    <TextBlock Text="Resume last wallpaper" Style="{StaticResource SettingTitleText}" />
+                                </StackPanel>
                                 <TextBlock Text="Apply the previous wallpaper when Intonaco Wallpaper starts"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
@@ -858,7 +874,10 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="Theme" Style="{StaticResource SettingTitleText}" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE790;" Style="{StaticResource SettingGlyphText}" />
+                                    <TextBlock Text="Theme" Style="{StaticResource SettingTitleText}" />
+                                </StackPanel>
                                 <TextBlock Text="Choose the app appearance"
                                            Style="{StaticResource SettingDescriptionText}" />
                             </StackPanel>
