@@ -14,8 +14,8 @@ The repository stores the Partner Center identity supplied for this app:
 
 ## Upload this file, not the GitHub EXE
 
-After the official release workflow passes, download:
-https://github.com/p4yy/Intonaco/releases/download/Intonaco-Wallpaper/Intonaco-Wallpaper.msixupload
+Download the newly published official v2.2.0 Store submission file (not the outdated release):
+https://github.com/p4yy/Intonaco/releases/download/v2.2.0/Intonaco-Wallpaper.msixupload
 
 Open **https://partner.microsoft.com/dashboard** and select the existing
 **Intonaco Wallpaper** app/product identified by `9PBBDCR0C6LH`, or
