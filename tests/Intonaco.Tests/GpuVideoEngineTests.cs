@@ -297,6 +297,8 @@ namespace Intonaco.Tests
                 mainWindow!);
             Assert.Contains("if (_player is GpuVideoWallpaperPlayer && !_lastVideoOpened)",
                 mainWindow!);
+            Assert.Contains("requestVersion != _wallpaperRequestVersion",
+                mainWindow!);
             Assert.DoesNotContain("EmptyWorkingSet", mainWindow!);
         }
 
